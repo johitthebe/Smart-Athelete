@@ -27,6 +27,7 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
+AUTH_USER_MODEL = 'accounts.User'
 
 # Application definition
 
@@ -38,6 +39,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'api',
+    'accounts',
     'rest_framework', # Django REST Framework for APIs
     'corsheaders', # Enable cross-origin requests for frontend apps
 ]
@@ -84,7 +86,7 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'smart_athlet',
+        'NAME': 'smart_athlete',
         'USER': 'postgres',
         'PASSWORD': '12345678',
         'HOST': 'localhost',
