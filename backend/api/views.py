@@ -20,24 +20,26 @@ def get_csrf(request):
 # -----------------------------
 # Register API
 # -----------------------------
-@api_view(['POST'])
+@api_view(["POST"])
 @permission_classes([AllowAny])
 def register_api(request):
     serializer = UserSerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.save()
         login(request, user)
-        return Response({
-            "message": "User registered successfully",
-            "user": {
-                "id": user.id,
-                "username": user.username,
-                "email": user.email,
-                "role": user.role
-            }
-        }, status=status.HTTP_201_CREATED)
+        return Response(
+            {
+                "message": "User registered successfully",
+                "user": {
+                    "id": user.id,
+                    "username": user.username,
+                    "email": user.email,
+                    # "role": user.role,  # remove this line
+                },
+            },
+            status=status.HTTP_201_CREATED,
+        )
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 
 # -----------------------------
 # Login API
