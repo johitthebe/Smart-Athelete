@@ -40,13 +40,19 @@ def get_csrf(request):
 # -----------------------------
 # Register API
 # -----------------------------
+from django.contrib.auth import login
+
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def register_api(request):
     serializer = UserSerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.save()
-        login(request, user)
+
+        backend = "django.contrib.auth.backends.ModelBackend"
+        user.backend = backend
+        login(request, user, backend=backend)
+
         return Response(
             {
                 "message": "User registered successfully",
@@ -54,11 +60,11 @@ def register_api(request):
                     "id": user.id,
                     "username": user.username,
                     "email": user.email,
+                    "role": getattr(user, "role", None),
                 },
             },
             status=status.HTTP_201_CREATED,
         )
-
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 

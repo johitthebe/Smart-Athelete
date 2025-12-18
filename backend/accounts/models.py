@@ -3,7 +3,12 @@ from django.db import models
 
 class User(AbstractUser):
     ROLE_CHOICES = (
-        ('player', 'Player'),
-        ('coach', 'Coach'),
+        ("athlete", "Athlete"),
+        ("coach", "Coach"),
     )
-role = models.CharField(max_length=20, null=True, blank=True)
+
+    role = models.CharField(
+        max_length=20,
+        choices=ROLE_CHOICES,
+        default="athlete",
+    )
