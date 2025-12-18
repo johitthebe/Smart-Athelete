@@ -3,7 +3,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
 from django.contrib.auth import authenticate
-from .serializers import UserSignupSerializer
+from .serializers import UserSerializer
 
 
 @api_view(["POST"])
