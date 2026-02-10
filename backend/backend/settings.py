@@ -24,6 +24,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.contrib.sites",
+    'performance',
 
     # Third‑party apps
     "rest_framework",
@@ -37,6 +38,15 @@ INSTALLED_APPS = [
     "api",
     "accounts",
 ]
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.SessionAuthentication",
+        # add TokenAuthentication / JWT later if you want
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+}
 
 SITE_ID = 1
 
@@ -65,6 +75,17 @@ CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]
+
+# Session settings for cross-origin requests
+SESSION_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_SECURE = False  # Set to True in production with HTTPS
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_DOMAIN = None  # Allow localhost and 127.0.0.1
+
+# CSRF settings
+CSRF_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SECURE = False  # Set to True in production with HTTPS
+CSRF_COOKIE_HTTPONLY = False  # Must be False so JavaScript can read it
 
 TEMPLATES = [
     {

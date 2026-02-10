@@ -12,7 +12,7 @@ def register_api(request):
     """
     Register a new user.
     """
-    serializer = UserSignupSerializer(data=request.data)
+    serializer = UserSerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.save()
         return Response(

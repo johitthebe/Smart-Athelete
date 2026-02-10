@@ -4,27 +4,11 @@ from rest_framework import status
 
 from django.contrib.auth import authenticate, login
 from django.views.decorators.csrf import ensure_csrf_cookie
+from django.db import IntegrityError
 
 from .serializers import UserSerializer
 from accounts.models import User
 from rest_framework.permissions import IsAuthenticated, AllowAny
-
-
-# -----------------------------
-# Current user (after login, incl. Google)
-# -----------------------------
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def current_user(request):
-    user = request.user
-    return Response(
-        {
-            "id": user.id,
-            "username": user.username,
-            "email": user.email,
-            "role": getattr(user, "role", None),
-        }
-    )
 
 
 # -----------------------------
@@ -38,38 +22,80 @@ def get_csrf(request):
 
 
 # -----------------------------
-# Register API
+# Current user (GET /api/auth/me/)
 # -----------------------------
-from django.contrib.auth import login
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def current_user(request):
+    user = request.user
+    return Response(
+        {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "role": getattr(user, "role", None),
+        }
+    )
 
+
+# -----------------------------
+# Register API (POST /api/auth/register/)
+# -----------------------------
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def register_api(request):
     serializer = UserSerializer(data=request.data)
     if serializer.is_valid():
-        user = serializer.save()
+        try:
+            # Create user without role (will be set later)
+            user = serializer.save()
 
-        backend = "django.contrib.auth.backends.ModelBackend"
-        user.backend = backend
-        login(request, user, backend=backend)
+            # Auto-login after registration
+            backend = "django.contrib.auth.backends.ModelBackend"
+            user.backend = backend
+            login(request, user, backend=backend)
 
-        return Response(
-            {
-                "message": "User registered successfully",
-                "user": {
-                    "id": user.id,
-                    "username": user.username,
-                    "email": user.email,
-                    "role": getattr(user, "role", None),
+            return Response(
+                {
+                    "message": "User registered successfully",
+                    "user": {
+                        "id": user.id,
+                        "username": user.username,
+                        "email": user.email,
+                        "first_name": user.first_name,
+                        "last_name": user.last_name,
+                        "role": getattr(user, "role", None),
+                    },
                 },
-            },
-            status=status.HTTP_201_CREATED,
-        )
+                status=status.HTTP_201_CREATED,
+            )
+        except IntegrityError as e:
+            # Handle database integrity errors (duplicate username/email)
+            error_message = str(e).lower()
+            if "username" in error_message:
+                return Response(
+                    {"username": ["This username is already taken."]},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            elif "email" in error_message:
+                return Response(
+                    {"email": ["This email is already registered."]},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            else:
+                return Response(
+                    {"error": "Registration failed. Please try again."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+    
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 # -----------------------------
-# Login API (email or username)
+# Login API (POST /api/auth/login/)
+# Accepts identifier (username or email) + password
 # -----------------------------
 @api_view(["POST"])
 @permission_classes([AllowAny])
@@ -79,14 +105,14 @@ def login_api(request):
 
     if not identifier or not password:
         return Response(
-            {"error": "Email/username and password are required."},
+            {"error": "Username/email and password are required."},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    # Try username first
+    # Try authenticating with username first
     user = authenticate(request, username=identifier, password=password)
 
-    # If not found, try treating identifier as email
+    # If that fails, try treating identifier as email
     if user is None:
         try:
             user_obj = User.objects.get(email=identifier)
@@ -105,6 +131,8 @@ def login_api(request):
                     "id": user.id,
                     "username": user.username,
                     "email": user.email,
+                    "first_name": user.first_name,
+                    "last_name": user.last_name,
                     "role": getattr(user, "role", None),
                 },
             },
@@ -113,22 +141,79 @@ def login_api(request):
 
     if user is not None and not user.is_active:
         return Response(
-            {"error": "User account is inactive."},
+            {"error": "Your account is inactive. Please contact support."},
             status=status.HTTP_403_FORBIDDEN,
         )
 
     return Response(
-        {"error": "Invalid credentials"},
+        {"error": "Invalid username/email or password."},
         status=status.HTTP_401_UNAUTHORIZED,
     )
 
 
 # -----------------------------
-# Set Role API
+# Set My Role (POST /api/auth/set-my-role/)
+# Self-service role selection (one-time for athlete/coach)
 # -----------------------------
 @api_view(["POST"])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
+def set_my_role(request):
+    user = request.user
+    role = request.data.get("role")
+
+    # Validate role
+    if not role:
+        return Response(
+            {"error": "Role is required."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Only allow athlete or coach roles for self-service
+    if role not in ["athlete", "coach"]:
+        return Response(
+            {"error": "Invalid role. Only 'athlete' or 'coach' allowed."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Check if user already has a role set (one-time only)
+    if user.role and user.role != "athlete":  # athlete is default, so allow change
+        return Response(
+            {"error": "Role already set. Contact admin to change."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    # Set the role
+    user.role = role
+    user.save()
+
+    return Response(
+        {
+            "message": "Role set successfully",
+            "user": {
+                "id": user.id,
+                "username": user.username,
+                "email": user.email,
+                "role": user.role,
+            },
+        },
+        status=status.HTTP_200_OK,
+    )
+
+
+# -----------------------------
+# Set Role (POST /api/auth/set-role/)
+# Admin-only endpoint to set any user's role
+# -----------------------------
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
 def set_role(request):
+    # Check if user is admin
+    if request.user.role != "admin" and not request.user.is_superuser:
+        return Response(
+            {"error": "Only admins can set user roles."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
     user_id = request.data.get("user_id")
     role = request.data.get("role")
 
@@ -138,12 +223,28 @@ def set_role(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
+    # Validate role
+    valid_roles = ["athlete", "coach", "coach_pending", "admin"]
+    if role not in valid_roles:
+        return Response(
+            {"error": f"Invalid role. Must be one of: {', '.join(valid_roles)}"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
     try:
         user = User.objects.get(id=user_id)
         user.role = role
         user.save()
         return Response(
-            {"message": "Role updated successfully"},
+            {
+                "message": "Role updated successfully",
+                "user": {
+                    "id": user.id,
+                    "username": user.username,
+                    "email": user.email,
+                    "role": user.role,
+                },
+            },
             status=status.HTTP_200_OK,
         )
     except User.DoesNotExist:
@@ -151,3 +252,4 @@ def set_role(request):
             {"error": "User not found"},
             status=status.HTTP_404_NOT_FOUND,
         )
+
