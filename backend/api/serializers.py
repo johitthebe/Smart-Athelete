@@ -90,3 +90,20 @@ class AdminUserSerializer(serializers.ModelSerializer):
         
         instance.save()
         return instance
+
+from api.models import AdminNotification
+
+
+class AdminNotificationSerializer(serializers.ModelSerializer):
+    coach_name = serializers.CharField(source='coach.get_full_name', read_only=True)
+    coach_email = serializers.EmailField(source='coach.email', read_only=True)
+    credential_count = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = AdminNotification
+        fields = ['id', 'notification_type', 'coach', 'coach_name', 'coach_email', 
+                  'message', 'is_read', 'created_at', 'credential_count']
+        read_only_fields = ['id', 'created_at']
+    
+    def get_credential_count(self, obj):
+        return obj.coach.credentials.count()
