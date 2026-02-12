@@ -82,8 +82,6 @@ class AdminUserViewSet(viewsets.ModelViewSet):
     
     def destroy(self, request, *args, **kwargs):
         """Delete user"""
-        print(f"Delete request from user: {request.user.username}, role: {getattr(request.user, 'role', 'NO ROLE')}, is_admin: {is_admin(request.user)}")
-        
         if not is_admin(request.user):
             return Response(
                 {"error": "Only admins can delete users"},
