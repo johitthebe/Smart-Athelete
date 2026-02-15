@@ -50,3 +50,40 @@ class CoachApprovalSerializer(serializers.ModelSerializer):
     
     def get_credential_count(self, obj):
         return obj.coach.credentials.count()
+
+
+from accounts.models import CoachAthleteAssignment
+
+
+class CoachAthleteAssignmentSerializer(serializers.ModelSerializer):
+    coach_name = serializers.CharField(source='coach.get_full_name', read_only=True)
+    coach_email = serializers.EmailField(source='coach.email', read_only=True)
+    coach_username = serializers.CharField(source='coach.username', read_only=True)
+    athlete_name = serializers.CharField(source='athlete.get_full_name', read_only=True)
+    athlete_email = serializers.EmailField(source='athlete.email', read_only=True)
+    athlete_username = serializers.CharField(source='athlete.username', read_only=True)
+    assigned_by_name = serializers.CharField(source='assigned_by.get_full_name', read_only=True, allow_null=True)
+    
+    class Meta:
+        model = CoachAthleteAssignment
+        fields = [
+            'id', 'coach', 'coach_name', 'coach_email', 'coach_username',
+            'athlete', 'athlete_name', 'athlete_email', 'athlete_username',
+            'assigned_by', 'assigned_by_name', 'assigned_at', 'is_active', 'notes'
+        ]
+        read_only_fields = ['id', 'assigned_by', 'assigned_at']
+    
+    def validate(self, data):
+        # Ensure coach has coach role
+        if data['coach'].role != 'coach':
+            raise serializers.ValidationError("Selected user is not a coach")
+        
+        # Ensure athlete has athlete role
+        if data['athlete'].role != 'athlete':
+            raise serializers.ValidationError("Selected user is not an athlete")
+        
+        # Prevent self-assignment
+        if data['coach'] == data['athlete']:
+            raise serializers.ValidationError("Cannot assign a user to themselves")
+        
+        return data

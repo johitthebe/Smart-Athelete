@@ -1,1 +1,1 @@
-# Commands module
+# Management commands

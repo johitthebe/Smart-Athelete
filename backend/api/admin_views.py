@@ -512,3 +512,332 @@ class AdminActivityTypeDetailView(APIView):
                 {"error": "Activity type not found"},
                 status=status.HTTP_404_NOT_FOUND
             )
+
+
+from accounts.models import CoachAthleteAssignment
+from accounts.serializers import CoachAthleteAssignmentSerializer
+
+
+class AdminCoachAthleteAssignmentListView(APIView):
+    """
+    API endpoint for admins to manage coach-athlete assignments
+    GET /api/admin/assignments/ - List all assignments
+    POST /api/admin/assignments/ - Create new assignment
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        if not is_admin(request.user):
+            return Response(
+                {"error": "Only admins can view assignments"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Filter options
+        coach_id = request.query_params.get('coach')
+        athlete_id = request.query_params.get('athlete')
+        is_active = request.query_params.get('is_active')
+        
+        assignments = CoachAthleteAssignment.objects.select_related(
+            'coach', 'athlete', 'assigned_by'
+        ).all()
+        
+        if coach_id:
+            assignments = assignments.filter(coach_id=coach_id)
+        if athlete_id:
+            assignments = assignments.filter(athlete_id=athlete_id)
+        if is_active is not None:
+            assignments = assignments.filter(is_active=is_active.lower() == 'true')
+        
+        serializer = CoachAthleteAssignmentSerializer(assignments, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    def post(self, request):
+        if not is_admin(request.user):
+            return Response(
+                {"error": "Only admins can create assignments"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        serializer = CoachAthleteAssignmentSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(assigned_by=request.user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class AdminCoachAthleteAssignmentDetailView(APIView):
+    """
+    API endpoint for admins to manage individual assignments
+    GET /api/admin/assignments/<id>/ - Get assignment details
+    PATCH /api/admin/assignments/<id>/ - Update assignment
+    DELETE /api/admin/assignments/<id>/ - Delete assignment
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request, pk):
+        if not is_admin(request.user):
+            return Response(
+                {"error": "Only admins can view assignments"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        try:
+            assignment = CoachAthleteAssignment.objects.select_related(
+                'coach', 'athlete', 'assigned_by'
+            ).get(pk=pk)
+            serializer = CoachAthleteAssignmentSerializer(assignment)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except CoachAthleteAssignment.DoesNotExist:
+            return Response(
+                {"error": "Assignment not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+    
+    def patch(self, request, pk):
+        if not is_admin(request.user):
+            return Response(
+                {"error": "Only admins can update assignments"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        try:
+            assignment = CoachAthleteAssignment.objects.get(pk=pk)
+            serializer = CoachAthleteAssignmentSerializer(
+                assignment, data=request.data, partial=True
+            )
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except CoachAthleteAssignment.DoesNotExist:
+            return Response(
+                {"error": "Assignment not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+    
+    def delete(self, request, pk):
+        if not is_admin(request.user):
+            return Response(
+                {"error": "Only admins can delete assignments"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        try:
+            assignment = CoachAthleteAssignment.objects.get(pk=pk)
+            assignment.delete()
+            return Response(
+                {"message": "Assignment deleted successfully"},
+                status=status.HTTP_200_OK
+            )
+        except CoachAthleteAssignment.DoesNotExist:
+            return Response(
+                {"error": "Assignment not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+
+class CoachAssignedAthletesView(APIView):
+    """
+    API endpoint for coaches to view their assigned athletes
+    GET /api/coach/athletes/ - List assigned athletes
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        if request.user.role != 'coach':
+            return Response(
+                {"error": "Only coaches can access this endpoint"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        assignments = CoachAthleteAssignment.objects.filter(
+            coach=request.user,
+            is_active=True
+        ).select_related('athlete')
+        
+        serializer = CoachAthleteAssignmentSerializer(assignments, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class AthleteAssignedCoachesView(APIView):
+    """
+    API endpoint for athletes to view their assigned coaches
+    GET /api/athlete/coaches/ - List assigned coaches
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        if request.user.role != 'athlete':
+            return Response(
+                {"error": "Only athletes can access this endpoint"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        assignments = CoachAthleteAssignment.objects.filter(
+            athlete=request.user,
+            is_active=True
+        ).select_related('coach')
+        
+        serializer = CoachAthleteAssignmentSerializer(assignments, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+
+class AdminDebugCoachStatusView(APIView):
+    """
+    Debug endpoint to check coach approval status
+    GET /api/admin/debug/coach-status/
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        if not is_admin(request.user):
+            return Response(
+                {"error": "Only admins can access debug endpoints"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        pending_coaches = User.objects.filter(role='coach_pending').count()
+        approved_coaches = User.objects.filter(role='coach').count()
+        pending_approvals = CoachApproval.objects.filter(status='pending').count()
+        approved_approvals = CoachApproval.objects.filter(status='approved').count()
+        
+        # Find inconsistencies
+        inconsistent_pending = CoachApproval.objects.filter(
+            status='pending',
+            coach__role='coach'
+        ).values_list('coach__username', flat=True)
+        
+        inconsistent_approved = CoachApproval.objects.filter(
+            status='approved',
+            coach__role='coach_pending'
+        ).values_list('coach__username', flat=True)
+        
+        return Response({
+            'pending_coaches_count': pending_coaches,
+            'approved_coaches_count': approved_coaches,
+            'pending_approvals_count': pending_approvals,
+            'approved_approvals_count': approved_approvals,
+            'inconsistent_pending': list(inconsistent_pending),
+            'inconsistent_approved': list(inconsistent_approved),
+            'has_inconsistencies': len(inconsistent_pending) > 0 or len(inconsistent_approved) > 0
+        }, status=status.HTTP_200_OK)
+
+
+
+from performance.models import Benchmark
+from performance.serializers import BenchmarkSerializer
+
+
+class AdminBenchmarkListView(APIView):
+    """
+    API endpoint for admins to manage benchmarks
+    GET /api/admin/benchmarks/ - List all
+    POST /api/admin/benchmarks/ - Create new
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        if not is_admin(request.user):
+            return Response(
+                {"error": "Only admins can view benchmarks"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        benchmarks = Benchmark.objects.all().order_by('event', 'level')
+        serializer = BenchmarkSerializer(benchmarks, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    def post(self, request):
+        if not is_admin(request.user):
+            return Response(
+                {"error": "Only admins can create benchmarks"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        serializer = BenchmarkSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class AdminBenchmarkDetailView(APIView):
+    """
+    API endpoint for admins to manage individual benchmarks
+    GET /api/admin/benchmarks/<id>/ - Get details
+    PUT /api/admin/benchmarks/<id>/ - Update
+    DELETE /api/admin/benchmarks/<id>/ - Delete
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request, pk):
+        if not is_admin(request.user):
+            return Response(
+                {"error": "Only admins can view benchmarks"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        try:
+            benchmark = Benchmark.objects.get(pk=pk)
+            serializer = BenchmarkSerializer(benchmark)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Benchmark.DoesNotExist:
+            return Response(
+                {"error": "Benchmark not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+    
+    def put(self, request, pk):
+        if not is_admin(request.user):
+            return Response(
+                {"error": "Only admins can update benchmarks"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        try:
+            benchmark = Benchmark.objects.get(pk=pk)
+            serializer = BenchmarkSerializer(benchmark, data=request.data)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Benchmark.DoesNotExist:
+            return Response(
+                {"error": "Benchmark not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+    
+    def delete(self, request, pk):
+        if not is_admin(request.user):
+            return Response(
+                {"error": "Only admins can delete benchmarks"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        try:
+            benchmark = Benchmark.objects.get(pk=pk)
+            
+            # Check if benchmark is being used
+            goals_count = benchmark.goals.count()
+            
+            if goals_count > 0:
+                return Response(
+                    {
+                        "error": f"Cannot delete benchmark. It is being used by {goals_count} goal(s).",
+                        "goals_count": goals_count
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            benchmark.delete()
+            return Response(
+                {"message": "Benchmark deleted successfully"},
+                status=status.HTTP_200_OK
+            )
+        except Benchmark.DoesNotExist:
+            return Response(
+                {"error": "Benchmark not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )

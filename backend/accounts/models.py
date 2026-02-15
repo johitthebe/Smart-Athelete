@@ -71,3 +71,40 @@ class CoachApproval(models.Model):
     
     def __str__(self):
         return f"{self.coach.get_full_name()} - {self.status}"
+
+
+class CoachAthleteAssignment(models.Model):
+    """Model to manage coach-athlete assignments"""
+    coach = models.ForeignKey(
+        User, 
+        on_delete=models.CASCADE, 
+        related_name='assigned_athletes',
+        limit_choices_to={'role': 'coach'}
+    )
+    athlete = models.ForeignKey(
+        User, 
+        on_delete=models.CASCADE, 
+        related_name='assigned_coaches',
+        limit_choices_to={'role': 'athlete'}
+    )
+    assigned_by = models.ForeignKey(
+        User, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        related_name='assignments_made',
+        limit_choices_to={'role': 'admin'}
+    )
+    assigned_at = models.DateTimeField(auto_now_add=True)
+    is_active = models.BooleanField(default=True)
+    notes = models.TextField(blank=True, help_text="Admin notes about this assignment")
+    
+    class Meta:
+        ordering = ['-assigned_at']
+        unique_together = ['coach', 'athlete']
+        indexes = [
+            models.Index(fields=['coach', 'is_active']),
+            models.Index(fields=['athlete', 'is_active']),
+        ]
+    
+    def __str__(self):
+        return f"{self.coach.get_full_name()} → {self.athlete.get_full_name()}"

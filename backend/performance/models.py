@@ -40,7 +40,7 @@ class Goal(models.Model):
         on_delete=models.CASCADE,
         related_name='goals'
     )
-    name = models.CharField(max_length=200, help_text="Goal name, e.g., 'Run 5km in under 30 minutes'")
+    name = models.CharField(max_length=200, default="Untitled Goal", help_text="Goal name, e.g., 'Run 5km in under 30 minutes'")
     description = models.TextField(blank=True, help_text="Detailed description of the goal")
     activity_type = models.ForeignKey(
         ActivityType,
@@ -125,6 +125,8 @@ class PerformanceLog(models.Model):
         Goal,
         on_delete=models.CASCADE,
         related_name='logs',
+        null=True,
+        blank=True,
         help_text="Associated goal for this performance log"
     )
     activity_type = models.ForeignKey(

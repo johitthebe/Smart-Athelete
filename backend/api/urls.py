@@ -9,7 +9,14 @@ from .admin_views import (
     AdminNotificationListView,
     AdminNotificationMarkReadView,
     AdminActivityTypeListView,
-    AdminActivityTypeDetailView
+    AdminActivityTypeDetailView,
+    AdminCoachAthleteAssignmentListView,
+    AdminCoachAthleteAssignmentDetailView,
+    CoachAssignedAthletesView,
+    AthleteAssignedCoachesView,
+    AdminDebugCoachStatusView,
+    AdminBenchmarkListView,
+    AdminBenchmarkDetailView
 )
 from .coach_views import (
     upload_credential,
@@ -69,6 +76,19 @@ urlpatterns = [
     # Admin activity types (exercises/workouts)
     path("admin/activity-types/", AdminActivityTypeListView.as_view(), name='admin-activity-types'),
     path("admin/activity-types/<int:pk>/", AdminActivityTypeDetailView.as_view(), name='admin-activity-type-detail'),
+    
+    # Admin coach-athlete assignments
+    path("admin/assignments/", AdminCoachAthleteAssignmentListView.as_view(), name='admin-assignments'),
+    path("admin/assignments/<int:pk>/", AdminCoachAthleteAssignmentDetailView.as_view(), name='admin-assignment-detail'),
+    
+    # Coach endpoints
+    path("coach/athletes/", CoachAssignedAthletesView.as_view(), name='coach-athletes'),
+    
+    # Athlete endpoints
+    path("athlete/coaches/", AthleteAssignedCoachesView.as_view(), name='athlete-coaches'),
+    
+    # Debug endpoints (admin only)
+    path("admin/debug/coach-status/", AdminDebugCoachStatusView.as_view(), name='admin-debug-coach-status'),
     
     # Performance endpoints
     path("", include("performance.urls")),
