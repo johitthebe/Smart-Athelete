@@ -7,7 +7,15 @@ from .admin_views import (
     ApproveCoachView,
     RejectCoachView,
     AdminNotificationListView,
-    AdminNotificationMarkReadView
+    AdminNotificationMarkReadView,
+    AdminActivityTypeListView,
+    AdminActivityTypeDetailView
+)
+from .coach_views import (
+    upload_credential,
+    list_credentials,
+    delete_credential,
+    coach_status
 )
 
 urlpatterns = [
@@ -20,6 +28,12 @@ urlpatterns = [
     path("auth/me/", views.current_user, name="current-user"),
     path("auth/set-my-role/", views.set_my_role, name="set-my-role"),
     path("auth/set-role/", views.set_role, name="set-role"),  # Admin only
+    
+    # Coach credential endpoints
+    path("auth/coach/credentials/", upload_credential, name="coach-upload-credential"),
+    path("auth/coach/credentials/list/", list_credentials, name="coach-list-credentials"),
+    path("auth/coach/credentials/<int:credential_id>/", delete_credential, name="coach-delete-credential"),
+    path("auth/coach/status/", coach_status, name="coach-status"),
     
     # Admin user management (manual routes to avoid router conflict)
     path("admin/users/", AdminUserViewSet.as_view({
@@ -51,6 +65,10 @@ urlpatterns = [
     # Admin notifications
     path("admin/notifications/", AdminNotificationListView.as_view(), name='admin-notifications'),
     path("admin/notifications/<int:pk>/read/", AdminNotificationMarkReadView.as_view(), name='admin-notification-read'),
+    
+    # Admin activity types (exercises/workouts)
+    path("admin/activity-types/", AdminActivityTypeListView.as_view(), name='admin-activity-types'),
+    path("admin/activity-types/<int:pk>/", AdminActivityTypeDetailView.as_view(), name='admin-activity-type-detail'),
     
     # Performance endpoints
     path("", include("performance.urls")),

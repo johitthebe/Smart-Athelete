@@ -183,6 +183,8 @@ from accounts.serializers import CoachApprovalSerializer
 from api.models import AdminNotification
 from api.serializers import AdminNotificationSerializer
 from django.utils import timezone
+from performance.models import ActivityType
+from performance.serializers import ActivityTypeSerializer
 
 
 class PendingCoachesListView(APIView):
@@ -199,11 +201,20 @@ class PendingCoachesListView(APIView):
                 status=status.HTTP_403_FORBIDDEN
             )
         
-        # Get coaches with pending status who have submitted credentials
+        # Get all coaches with coach_pending role
+        pending_coaches = User.objects.filter(role='coach_pending')
+        
+        # Create CoachApproval records for coaches who don't have one
+        for coach in pending_coaches:
+            CoachApproval.objects.get_or_create(
+                coach=coach,
+                defaults={'status': 'pending'}
+            )
+        
+        # Get all coaches with pending status (with or without credentials)
         pending_approvals = CoachApproval.objects.filter(
-            status='pending',
-            coach__credentials__isnull=False
-        ).distinct().order_by('-coach__credentials__uploaded_at')
+            status='pending'
+        ).select_related('coach').prefetch_related('coach__credentials').order_by('-created_at')
         
         serializer = CoachApprovalSerializer(pending_approvals, many=True, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -384,5 +395,120 @@ class AdminNotificationMarkReadView(APIView):
         except AdminNotification.DoesNotExist:
             return Response(
                 {"error": "Notification not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+
+class AdminActivityTypeListView(APIView):
+    """
+    API endpoint for admins to manage activity types (exercises/workouts)
+    GET /api/admin/activity-types/ - List all
+    POST /api/admin/activity-types/ - Create new
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        if not is_admin(request.user):
+            return Response(
+                {"error": "Only admins can view activity types"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        activity_types = ActivityType.objects.all().order_by('name')
+        serializer = ActivityTypeSerializer(activity_types, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    def post(self, request):
+        if not is_admin(request.user):
+            return Response(
+                {"error": "Only admins can create activity types"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        serializer = ActivityTypeSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class AdminActivityTypeDetailView(APIView):
+    """
+    API endpoint for admins to manage individual activity types
+    GET /api/admin/activity-types/<id>/ - Get details
+    PUT /api/admin/activity-types/<id>/ - Update
+    DELETE /api/admin/activity-types/<id>/ - Delete
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request, pk):
+        if not is_admin(request.user):
+            return Response(
+                {"error": "Only admins can view activity types"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        try:
+            activity_type = ActivityType.objects.get(pk=pk)
+            serializer = ActivityTypeSerializer(activity_type)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except ActivityType.DoesNotExist:
+            return Response(
+                {"error": "Activity type not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+    
+    def put(self, request, pk):
+        if not is_admin(request.user):
+            return Response(
+                {"error": "Only admins can update activity types"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        try:
+            activity_type = ActivityType.objects.get(pk=pk)
+            serializer = ActivityTypeSerializer(activity_type, data=request.data)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except ActivityType.DoesNotExist:
+            return Response(
+                {"error": "Activity type not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+    
+    def delete(self, request, pk):
+        if not is_admin(request.user):
+            return Response(
+                {"error": "Only admins can delete activity types"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        try:
+            activity_type = ActivityType.objects.get(pk=pk)
+            
+            # Check if activity type is being used
+            goals_count = activity_type.goals.count()
+            logs_count = activity_type.logs.count()
+            
+            if goals_count > 0 or logs_count > 0:
+                return Response(
+                    {
+                        "error": f"Cannot delete activity type. It is being used by {goals_count} goal(s) and {logs_count} performance log(s).",
+                        "goals_count": goals_count,
+                        "logs_count": logs_count
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            activity_type.delete()
+            return Response(
+                {"message": "Activity type deleted successfully"},
+                status=status.HTTP_200_OK
+            )
+        except ActivityType.DoesNotExist:
+            return Response(
+                {"error": "Activity type not found"},
                 status=status.HTTP_404_NOT_FOUND
             )
