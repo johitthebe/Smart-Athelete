@@ -165,12 +165,101 @@ class PerformanceLogViewSet(viewsets.ModelViewSet):
             total_distance=Sum('distance'),
             total_duration=Sum('duration'),
             total_calories=Sum('calories'),
-            avg_heart_rate=Avg('heart_rate'),
-            avg_pace=Avg('pace'),
             log_count=Count('id')
         )
         
         return Response(aggregates)
+
+
+class BenchmarkComparisonView(APIView):
+    """Get benchmark comparison data for athlete dashboard"""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        athlete = request.user
+        
+        # Get active goals with benchmarks
+        active_goals = Goal.objects.filter(
+            athlete=athlete,
+            status='active'
+        ).select_related('benchmark', 'activity_type').prefetch_related('logs')
+        
+        comparison_data = []
+        
+        for goal in active_goals:
+            # Get athlete's best performance for this goal
+            best_log = PerformanceLog.objects.filter(
+                athlete=athlete,
+                goal=goal
+            ).order_by('value').first() if goal.logs.exists() else None
+            
+            # Get current (latest) performance
+            current_log = goal.logs.order_by('-date').first() if goal.logs.exists() else None
+            
+            # Calculate how many users this athlete has beaten
+            users_beaten = 0
+            total_competitors = 0
+            if best_log and best_log.value:
+                # Count unique athletes with worse performance in same event/activity
+                if goal.activity_type or goal.event:
+                    # Get all unique athletes who have logged this event/activity
+                    all_athlete_ids = PerformanceLog.objects.filter(
+                        Q(activity_type=goal.activity_type) | Q(event=goal.event)
+                    ).exclude(athlete=athlete).values_list('athlete_id', flat=True).distinct()
+                    
+                    total_competitors = len(set(all_athlete_ids))
+                    
+                    # Count how many athletes have worse best performance
+                    for athlete_id in all_athlete_ids:
+                        their_best = PerformanceLog.objects.filter(
+                            athlete_id=athlete_id
+                        ).filter(
+                            Q(activity_type=goal.activity_type) | Q(event=goal.event)
+                        ).order_by('value').first()
+                        
+                        if their_best and their_best.value > best_log.value:
+                            users_beaten += 1
+            
+            # Get competing athletes (other athletes with same event/activity)
+            competing_athletes = []
+            if goal.activity_type or goal.event:
+                # Find other athletes' best performances
+                other_logs = PerformanceLog.objects.filter(
+                    Q(activity_type=goal.activity_type) | Q(event=goal.event)
+                ).exclude(athlete=athlete).select_related('athlete').order_by('value')[:5]
+                
+                for log in other_logs:
+                    competing_athletes.append({
+                        'name': f"{log.athlete.first_name} {log.athlete.last_name}".strip() or log.athlete.username,
+                        'value': log.value,
+                        'unit': goal.target_unit,
+                    })
+            
+            comparison_data.append({
+                'goal_id': goal.id,
+                'goal_name': goal.name,
+                'event': goal.event or (goal.activity_type.name if goal.activity_type else ''),
+                'activity_type': goal.activity_type.name if goal.activity_type else None,
+                'target_value': goal.target_value,
+                'current_value': current_log.value if current_log else None,
+                'best_value': best_log.value if best_log else None,
+                'progress_percentage': goal.progress_percentage(),
+                'unit': goal.target_unit,
+                'benchmark': {
+                    'value': goal.benchmark.benchmark_value if goal.benchmark else None,
+                    'level': goal.benchmark.level if goal.benchmark else None,
+                    'athlete_name': goal.benchmark.athlete_name if goal.benchmark else None,
+                } if goal.benchmark else None,
+                'competing_athletes': competing_athletes,
+                'users_beaten': users_beaten,
+                'total_competitors': total_competitors,
+                'status': goal.status,
+            })
+        
+        return Response({
+            'comparisons': comparison_data,
+            'total_active_goals': len(comparison_data)
+        })
 
 
 class AdminStatsView(APIView):

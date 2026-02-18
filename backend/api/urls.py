@@ -77,6 +77,10 @@ urlpatterns = [
     path("admin/activity-types/", AdminActivityTypeListView.as_view(), name='admin-activity-types'),
     path("admin/activity-types/<int:pk>/", AdminActivityTypeDetailView.as_view(), name='admin-activity-type-detail'),
     
+    # Admin benchmarks
+    path("admin/benchmarks/", AdminBenchmarkListView.as_view(), name='admin-benchmarks'),
+    path("admin/benchmarks/<int:pk>/", AdminBenchmarkDetailView.as_view(), name='admin-benchmark-detail'),
+    
     # Admin coach-athlete assignments
     path("admin/assignments/", AdminCoachAthleteAssignmentListView.as_view(), name='admin-assignments'),
     path("admin/assignments/<int:pk>/", AdminCoachAthleteAssignmentDetailView.as_view(), name='admin-assignment-detail'),

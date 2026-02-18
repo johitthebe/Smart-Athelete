@@ -13,7 +13,19 @@ class ActivityTypeSerializer(serializers.ModelSerializer):
 class BenchmarkSerializer(serializers.ModelSerializer):
     class Meta:
         model = Benchmark
-        fields = ['id', 'event', 'level', 'benchmark_value', 'unit', 'created_at']
+        fields = [
+            'id', 'benchmark_type', 'athlete_name', 'event', 'level', 
+            'benchmark_value', 'unit', 'description', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+    
+    def validate(self, data):
+        # If benchmark_type is 'athlete', athlete_name is required
+        if data.get('benchmark_type') == 'athlete' and not data.get('athlete_name'):
+            raise serializers.ValidationError({
+                'athlete_name': 'Athlete name is required for athlete benchmarks'
+            })
+        return data
 
 
 class GoalSerializer(serializers.ModelSerializer):

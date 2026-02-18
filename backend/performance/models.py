@@ -19,19 +19,46 @@ class ActivityType(models.Model):
 
 
 class Benchmark(models.Model):
-    event = models.CharField(max_length=100)
+    """Performance benchmarks - can be general standards or athlete-specific"""
+    BENCHMARK_TYPE_CHOICES = (
+        ('general', 'General Standard'),
+        ('athlete', 'Athlete Benchmark'),
+    )
+    
+    benchmark_type = models.CharField(
+        max_length=20,
+        choices=BENCHMARK_TYPE_CHOICES,
+        default='general',
+        help_text="Type of benchmark"
+    )
+    athlete_name = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        help_text="e.g., Cristiano Ronaldo, Usain Bolt"
+    )
+    event = models.CharField(max_length=100, help_text="e.g., 100m Sprint, Marathon")
     level = models.CharField(
         max_length=50,
         default="general",
-        help_text="e.g., U18, U20, Elite"
+        help_text="e.g., U18, U20, Elite, Professional"
     )
-    benchmark_value = models.FloatField(help_text="e.g., 4.6 for 40m sprint in seconds")
-    unit = models.CharField(max_length=20, default="seconds", help_text="seconds, meters, etc")
+    benchmark_value = models.FloatField(help_text="e.g., 9.58 for 100m sprint in seconds")
+    unit = models.CharField(max_length=20, default="seconds", help_text="seconds, meters, km, etc")
+    description = models.TextField(blank=True, help_text="Additional context about this benchmark")
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['benchmark_type', 'event', 'level']
+        indexes = [
+            models.Index(fields=['benchmark_type', 'event']),
+        ]
 
     def __str__(self):
+        if self.benchmark_type == 'athlete' and self.athlete_name:
+            return f"{self.athlete_name} - {self.event}: {self.benchmark_value}{self.unit}"
         return f"{self.event} ({self.level}): {self.benchmark_value}{self.unit}"
-
 
 class Goal(models.Model):
     """Enhanced Goal model with activity type and detailed tracking"""
@@ -146,11 +173,7 @@ class PerformanceLog(models.Model):
     
     # Performance metrics
     distance = models.FloatField(null=True, blank=True, help_text="Distance in kilometers")
-    heart_rate = models.IntegerField(null=True, blank=True, help_text="Average heart rate in BPM")
     calories = models.IntegerField(null=True, blank=True, help_text="Calories burned")
-    power = models.IntegerField(null=True, blank=True, help_text="Average power in watts")
-    pace = models.FloatField(null=True, blank=True, help_text="Pace in min/km")
-    elevation = models.IntegerField(null=True, blank=True, help_text="Elevation gain in meters")
     
     intensity = models.IntegerField(
         default=5,

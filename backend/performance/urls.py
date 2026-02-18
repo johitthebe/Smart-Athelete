@@ -6,6 +6,7 @@ from .views import (
     BenchmarkViewSet,
     PerformanceLogViewSet,
     ActivityTypeViewSet,
+    BenchmarkComparisonView,
     AdminStatsView
 )
 
@@ -17,6 +18,7 @@ router.register(r'activity-types', ActivityTypeViewSet, basename='activity-type'
 
 urlpatterns = [
     path('', include(router.urls)),
+    path('benchmark-comparison/', BenchmarkComparisonView.as_view(), name='benchmark-comparison'),
     path('admin/stats/', AdminStatsView.as_view(), name='admin-stats'),
 ]
 
