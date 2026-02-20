@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import Goal, Benchmark, PerformanceLog, ActivityType
+from .feedback_models import CoachFeedback
 from django.utils import timezone
 
 
@@ -155,3 +156,56 @@ class PerformanceLogSerializer(serializers.ModelSerializer):
         validated_data['athlete'] = self.context['request'].user
         return super().create(validated_data)
 
+
+
+class CoachFeedbackSerializer(serializers.ModelSerializer):
+    coach_name = serializers.CharField(source='coach.get_full_name', read_only=True)
+    athlete_name = serializers.CharField(source='athlete.get_full_name', read_only=True)
+    performance_log_details = serializers.SerializerMethodField()
+    goal_details = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = CoachFeedback
+        fields = [
+            'id', 'coach', 'coach_name', 'athlete', 'athlete_name',
+            'feedback_type', 'title', 'message',
+            'performance_log', 'performance_log_details',
+            'goal', 'goal_details',
+            'is_read', 'read_at', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['coach', 'coach_name', 'athlete_name', 'is_read', 'read_at', 'created_at', 'updated_at']
+    
+    def get_performance_log_details(self, obj):
+        if obj.performance_log:
+            return {
+                'id': obj.performance_log.id,
+                'date': obj.performance_log.date,
+                'activity': obj.performance_log.activity_type.name if obj.performance_log.activity_type else obj.performance_log.event,
+            }
+        return None
+    
+    def get_goal_details(self, obj):
+        if obj.goal:
+            return {
+                'id': obj.goal.id,
+                'name': obj.goal.name,
+                'progress': round(obj.goal.progress_percentage(), 2)
+            }
+        return None
+    
+    def validate(self, data):
+        # Validate title and message
+        if not data.get('title'):
+            raise serializers.ValidationError({'title': 'Feedback title is required'})
+        if not data.get('message'):
+            raise serializers.ValidationError({'message': 'Feedback message is required'})
+        
+        # Validate athlete exists
+        if not data.get('athlete'):
+            raise serializers.ValidationError({'athlete': 'Athlete is required'})
+        
+        return data
+    
+    def create(self, validated_data):
+        validated_data['coach'] = self.context['request'].user
+        return super().create(validated_data)

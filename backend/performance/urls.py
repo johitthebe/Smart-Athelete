@@ -7,7 +7,8 @@ from .views import (
     PerformanceLogViewSet,
     ActivityTypeViewSet,
     BenchmarkComparisonView,
-    AdminStatsView
+    AdminStatsView,
+    CoachFeedbackViewSet
 )
 
 router = DefaultRouter()
@@ -15,6 +16,7 @@ router.register(r'goals', GoalViewSet, basename='goal')
 router.register(r'benchmarks', BenchmarkViewSet, basename='benchmark')
 router.register(r'performance-logs', PerformanceLogViewSet, basename='performance-log')
 router.register(r'activity-types', ActivityTypeViewSet, basename='activity-type')
+router.register(r'feedback', CoachFeedbackViewSet, basename='feedback')
 
 urlpatterns = [
     path('', include(router.urls)),

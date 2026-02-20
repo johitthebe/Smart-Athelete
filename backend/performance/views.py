@@ -6,11 +6,13 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q
 
 from .models import Goal, Benchmark, PerformanceLog, ActivityType
+from .feedback_models import CoachFeedback
 from .serializers import (
     GoalSerializer,
     BenchmarkSerializer,
     PerformanceLogSerializer,
     ActivityTypeSerializer,
+    CoachFeedbackSerializer,
 )
 
 User = get_user_model()
@@ -286,3 +288,92 @@ class AdminStatsView(APIView):
             }
         )
 
+
+
+class CoachFeedbackViewSet(viewsets.ModelViewSet):
+    """ViewSet for coach feedback to athletes"""
+    serializer_class = CoachFeedbackSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_queryset(self):
+        """Return feedback based on user role"""
+        user = self.request.user
+        
+        if user.role == 'coach':
+            # Coaches see feedback they've given
+            return CoachFeedback.objects.filter(coach=user).select_related('athlete', 'goal', 'performance_log')
+        elif user.role == 'athlete':
+            # Athletes see feedback they've received
+            return CoachFeedback.objects.filter(athlete=user).select_related('coach', 'goal', 'performance_log')
+        else:
+            # Admins see all feedback
+            return CoachFeedback.objects.all().select_related('coach', 'athlete', 'goal', 'performance_log')
+    
+    def create(self, request, *args, **kwargs):
+        """Create new feedback - only coaches can create"""
+        if request.user.role != 'coach':
+            return Response(
+                {'error': 'Only coaches can provide feedback'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        return super().create(request, *args, **kwargs)
+    
+    @action(detail=False, methods=['get'])
+    def unread(self, request):
+        """Get unread feedback for athletes"""
+        if request.user.role != 'athlete':
+            return Response(
+                {'error': 'Only athletes can view unread feedback'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        unread_feedback = self.get_queryset().filter(is_read=False)
+        serializer = self.get_serializer(unread_feedback, many=True)
+        return Response({
+            'count': unread_feedback.count(),
+            'feedback': serializer.data
+        })
+    
+    @action(detail=True, methods=['post'])
+    def mark_read(self, request, pk=None):
+        """Mark feedback as read - only for athletes"""
+        if request.user.role != 'athlete':
+            return Response(
+                {'error': 'Only athletes can mark feedback as read'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        feedback = self.get_object()
+        if feedback.athlete != request.user:
+            return Response(
+                {'error': 'You can only mark your own feedback as read'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        feedback.mark_as_read()
+        serializer = self.get_serializer(feedback)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def for_athlete(self, request):
+        """Get all feedback for a specific athlete - coaches only"""
+        if request.user.role != 'coach':
+            return Response(
+                {'error': 'Only coaches can view athlete feedback'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        athlete_id = request.query_params.get('athlete_id')
+        if not athlete_id:
+            return Response(
+                {'error': 'athlete_id parameter is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        feedback = CoachFeedback.objects.filter(
+            coach=request.user,
+            athlete_id=athlete_id
+        ).select_related('goal', 'performance_log')
+        
+        serializer = self.get_serializer(feedback, many=True)
+        return Response(serializer.data)

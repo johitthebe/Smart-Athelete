@@ -74,3 +74,31 @@ class PerformanceLogAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+
+
+from .feedback_models import CoachFeedback
+
+@admin.register(CoachFeedback)
+class CoachFeedbackAdmin(admin.ModelAdmin):
+    list_display = ['coach', 'athlete', 'feedback_type', 'title', 'is_read', 'created_at']
+    list_filter = ['feedback_type', 'is_read', 'created_at']
+    search_fields = ['coach__username', 'athlete__username', 'title', 'message']
+    readonly_fields = ['created_at', 'updated_at', 'read_at']
+    date_hierarchy = 'created_at'
+    
+    fieldsets = (
+        ('Feedback Information', {
+            'fields': ('coach', 'athlete', 'feedback_type', 'title', 'message')
+        }),
+        ('Associations', {
+            'fields': ('performance_log', 'goal'),
+            'classes': ('collapse',)
+        }),
+        ('Status', {
+            'fields': ('is_read', 'read_at')
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
