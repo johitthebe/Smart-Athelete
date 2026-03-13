@@ -50,6 +50,8 @@ class CoachFeedback(models.Model):
     # Status tracking
     is_read = models.BooleanField(default=False)
     read_at = models.DateTimeField(null=True, blank=True)
+    is_acknowledged = models.BooleanField(default=False)
+    acknowledged_at = models.DateTimeField(null=True, blank=True)
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -69,4 +71,11 @@ class CoachFeedback(models.Model):
         if not self.is_read:
             self.is_read = True
             self.read_at = timezone.now()
+            self.save()
+    
+    def mark_as_acknowledged(self):
+        """Mark feedback as acknowledged"""
+        if not self.is_acknowledged:
+            self.is_acknowledged = True
+            self.acknowledged_at = timezone.now()
             self.save()

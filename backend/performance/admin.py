@@ -102,3 +102,48 @@ class CoachFeedbackAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+
+
+from .ai_models import SuggestedGoal, SuggestedWorkout
+
+@admin.register(SuggestedGoal)
+class SuggestedGoalAdmin(admin.ModelAdmin):
+    list_display = ['athlete', 'event', 'target_value', 'unit', 'difficulty_level', 'status', 'suggested_at']
+    list_filter = ['status', 'difficulty_level', 'suggested_at']
+    search_fields = ['athlete__username', 'event', 'reasoning']
+    readonly_fields = ['suggested_at', 'responded_at']
+    
+    fieldsets = (
+        ('Goal Details', {
+            'fields': ('athlete', 'event', 'target_value', 'unit', 'deadline_weeks')
+        }),
+        ('AI Analysis', {
+            'fields': ('difficulty_level', 'reasoning', 'training_required', 'key_tip')
+        }),
+        ('Status', {
+            'fields': ('status', 'actual_goal', 'suggested_at', 'responded_at')
+        }),
+    )
+
+
+@admin.register(SuggestedWorkout)
+class SuggestedWorkoutAdmin(admin.ModelAdmin):
+    list_display = ['athlete', 'name', 'workout_type', 'intensity', 'status', 'suggested_at']
+    list_filter = ['status', 'workout_type', 'suggested_at']
+    search_fields = ['athlete__username', 'name', 'description']
+    readonly_fields = ['suggested_at', 'added_at', 'completed_at']
+    
+    fieldsets = (
+        ('Workout Details', {
+            'fields': ('athlete', 'workout_type', 'name', 'description')
+        }),
+        ('Target', {
+            'fields': ('target_value', 'target_unit', 'intensity', 'estimated_duration')
+        }),
+        ('AI Analysis', {
+            'fields': ('reasoning', 'benefit')
+        }),
+        ('Status', {
+            'fields': ('status', 'actual_log', 'suggested_at', 'added_at', 'completed_at')
+        }),
+    )

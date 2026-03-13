@@ -1,5 +1,6 @@
 from django.db import models
 from accounts.models import User
+from .notification_models import Notification
 
 
 class AdminNotification(models.Model):

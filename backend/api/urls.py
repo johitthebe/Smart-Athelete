@@ -1,4 +1,5 @@
 from django.urls import path, include
+from rest_framework.routers import DefaultRouter
 from . import views
 from .admin_views import (
     AdminUserViewSet,
@@ -24,8 +25,16 @@ from .coach_views import (
     delete_credential,
     coach_status
 )
+from .notification_views import NotificationViewSet
+
+# Create router for viewsets
+router = DefaultRouter()
+router.register(r'notifications', NotificationViewSet, basename='notification')
 
 urlpatterns = [
+    # Router URLs
+    path('', include(router.urls)),
+    
     # CSRF token
     path("csrf/", views.get_csrf, name="get-csrf"),
     

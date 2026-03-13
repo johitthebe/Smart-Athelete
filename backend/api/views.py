@@ -24,20 +24,55 @@ def get_csrf(request):
 # -----------------------------
 # Current user (GET /api/auth/me/)
 # -----------------------------
-@api_view(["GET"])
+@api_view(["GET", "PATCH"])
 @permission_classes([IsAuthenticated])
 def current_user(request):
     user = request.user
-    return Response(
-        {
-            "id": user.id,
-            "username": user.username,
-            "email": user.email,
-            "first_name": user.first_name,
-            "last_name": user.last_name,
-            "role": getattr(user, "role", None),
-        }
-    )
+    
+    if request.method == "GET":
+        return Response(
+            {
+                "id": user.id,
+                "username": user.username,
+                "email": user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "role": getattr(user, "role", None),
+            }
+        )
+    
+    elif request.method == "PATCH":
+        # Update user profile
+        data = request.data
+        
+        # Update allowed fields
+        if "first_name" in data:
+            user.first_name = data["first_name"]
+        if "last_name" in data:
+            user.last_name = data["last_name"]
+        if "email" in data:
+            # Check if email is already taken by another user
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            if User.objects.filter(email=data["email"]).exclude(id=user.id).exists():
+                return Response(
+                    {"error": "Email already in use"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            user.email = data["email"]
+        
+        user.save()
+        
+        return Response(
+            {
+                "id": user.id,
+                "username": user.username,
+                "email": user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "role": getattr(user, "role", None),
+            }
+        )
 
 
 # -----------------------------

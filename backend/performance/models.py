@@ -180,6 +180,45 @@ class PerformanceLog(models.Model):
         default=5,
         help_text="1-10 scale"
     )
+    
+    # AI-Enhanced Context Fields (No devices needed!)
+    INTENSITY_CHOICES = [
+        ('easy', 'Easy Recovery'),
+        ('moderate', 'Steady'),
+        ('hard', 'Challenging'),
+        ('race', 'Maximum Effort'),
+    ]
+    intensity_level = models.CharField(
+        max_length=20,
+        choices=INTENSITY_CHOICES,
+        default='moderate',
+        help_text="How hard was this workout?"
+    )
+    
+    perceived_effort = models.IntegerField(
+        default=5,
+        help_text="How hard did this feel? 1=very easy, 10=maximum"
+    )
+    
+    # Optional context
+    weather = models.CharField(max_length=50, null=True, blank=True, help_text="hot, cold, rainy, etc.")
+    terrain = models.CharField(max_length=50, null=True, blank=True, help_text="flat, hilly, trail, etc.")
+    
+    # Qualitative feedback (most important for AI!)
+    HOW_FELT_CHOICES = [
+        ('great', '😊 Felt Great'),
+        ('good', '🙂 Felt Good'),
+        ('okay', '😐 Felt Okay'),
+        ('tired', '😓 Felt Tired'),
+        ('struggled', '😰 Struggled'),
+    ]
+    how_felt = models.CharField(
+        max_length=20,
+        choices=HOW_FELT_CHOICES,
+        default='good',
+        help_text="Overall feeling during workout"
+    )
+    
     notes = models.TextField(blank=True)
     date_logged = models.DateTimeField(default=timezone.now)
     created_at = models.DateTimeField(auto_now_add=True)

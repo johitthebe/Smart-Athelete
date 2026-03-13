@@ -639,8 +639,8 @@ class AdminCoachAthleteAssignmentDetailView(APIView):
 
 class CoachAssignedAthletesView(APIView):
     """
-    API endpoint for coaches to view their assigned athletes
-    GET /api/coach/athletes/ - List assigned athletes
+    API endpoint for coaches to view their assigned athletes with performance data
+    GET /api/coach/athletes/ - List assigned athletes with stats
     """
     permission_classes = [IsAuthenticated]
     
@@ -656,8 +656,74 @@ class CoachAssignedAthletesView(APIView):
             is_active=True
         ).select_related('athlete')
         
-        serializer = CoachAthleteAssignmentSerializer(assignments, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        athletes_data = []
+        for assignment in assignments:
+            athlete = assignment.athlete
+            
+            # Get performance stats
+            from performance.models import Goal, PerformanceLog
+            from datetime import datetime, timedelta
+            from django.db.models import Avg, Count
+            
+            # Active goals count
+            active_goals = Goal.objects.filter(
+                athlete=athlete,
+                status='active'
+            ).count()
+            
+            # Recent logs (last 30 days)
+            thirty_days_ago = datetime.now() - timedelta(days=30)
+            recent_logs = PerformanceLog.objects.filter(
+                athlete=athlete,
+                date__gte=thirty_days_ago
+            )
+            
+            # Last activity
+            last_log = PerformanceLog.objects.filter(athlete=athlete).order_by('-date').first()
+            last_activity = last_log.date.strftime('%Y-%m-%d') if last_log else None
+            
+            # Calculate performance trend (compare first half vs second half of month)
+            logs_count = recent_logs.count()
+            performance_trend = 0
+            if logs_count >= 4:
+                mid_point = logs_count // 2
+                first_half = recent_logs[:mid_point]
+                second_half = recent_logs[mid_point:]
+                
+                first_avg = first_half.aggregate(avg=Avg('distance'))['avg'] or 0
+                second_avg = second_half.aggregate(avg=Avg('distance'))['avg'] or 0
+                
+                if first_avg > 0:
+                    performance_trend = ((second_avg - first_avg) / first_avg) * 100
+            
+            # Determine status
+            if not last_log:
+                status_label = 'inactive'
+            elif (datetime.now().date() - last_log.date).days > 5:
+                status_label = 'inactive'
+            elif (datetime.now().date() - last_log.date).days > 2:
+                status_label = 'warning'
+            else:
+                status_label = 'active'
+            
+            athletes_data.append({
+                'id': athlete.id,
+                'username': athlete.username,
+                'first_name': athlete.first_name or '',
+                'last_name': athlete.last_name or '',
+                'email': athlete.email,
+                'athlete_name': athlete.get_full_name() or athlete.username,
+                'athlete_username': athlete.username,
+                'athlete_email': athlete.email,
+                'active_goals': active_goals,
+                'last_activity': last_activity,
+                'performance_trend': round(performance_trend, 1),
+                'status': status_label,
+                'total_logs': logs_count,
+                'assigned_at': assignment.assigned_at.strftime('%Y-%m-%d')
+            })
+        
+        return Response(athletes_data, status=status.HTTP_200_OK)
 
 
 class AthleteAssignedCoachesView(APIView):

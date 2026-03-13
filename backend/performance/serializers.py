@@ -112,9 +112,9 @@ class PerformanceLogSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'athlete', 'athlete_name', 'goal', 'goal_name',
             'activity_type', 'activity_type_id', 'event', 'value',
-            'date', 'duration', 'distance', 'heart_rate', 'calories',
-            'power', 'pace', 'elevation', 'intensity', 'notes',
-            'date_logged', 'created_at',
+            'date', 'duration', 'distance', 'calories', 'intensity',
+            'intensity_level', 'perceived_effort', 'weather', 'terrain', 'how_felt',
+            'notes', 'date_logged', 'created_at',
         ]
         read_only_fields = ['athlete', 'athlete_name', 'goal_name', 'created_at', 'date_logged']
 
@@ -171,9 +171,13 @@ class CoachFeedbackSerializer(serializers.ModelSerializer):
             'feedback_type', 'title', 'message',
             'performance_log', 'performance_log_details',
             'goal', 'goal_details',
-            'is_read', 'read_at', 'created_at', 'updated_at'
+            'is_read', 'read_at', 'is_acknowledged', 'acknowledged_at',
+            'created_at', 'updated_at'
         ]
-        read_only_fields = ['coach', 'coach_name', 'athlete_name', 'is_read', 'read_at', 'created_at', 'updated_at']
+        read_only_fields = [
+            'coach', 'coach_name', 'athlete_name', 'is_read', 'read_at',
+            'is_acknowledged', 'acknowledged_at', 'created_at', 'updated_at'
+        ]
     
     def get_performance_log_details(self, obj):
         if obj.performance_log:
@@ -209,3 +213,64 @@ class CoachFeedbackSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data['coach'] = self.context['request'].user
         return super().create(validated_data)
+
+
+from .ai_models import SuggestedGoal, SuggestedWorkout
+
+
+class SuggestedGoalSerializer(serializers.ModelSerializer):
+    athlete_name = serializers.CharField(source='athlete.get_full_name', read_only=True)
+    actual_goal_details = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = SuggestedGoal
+        fields = [
+            'id', 'athlete', 'athlete_name',
+            'event', 'target_value', 'unit', 'deadline_weeks',
+            'difficulty_level', 'reasoning', 'training_required', 'key_tip',
+            'status', 'actual_goal', 'actual_goal_details',
+            'suggested_at', 'responded_at'
+        ]
+        read_only_fields = [
+            'athlete', 'athlete_name', 'actual_goal', 'actual_goal_details',
+            'suggested_at', 'responded_at'
+        ]
+    
+    def get_actual_goal_details(self, obj):
+        if obj.actual_goal:
+            return {
+                'id': obj.actual_goal.id,
+                'name': obj.actual_goal.name,
+                'progress': round(obj.actual_goal.progress_percentage(), 2)
+            }
+        return None
+
+
+class SuggestedWorkoutSerializer(serializers.ModelSerializer):
+    athlete_name = serializers.CharField(source='athlete.get_full_name', read_only=True)
+    actual_log_details = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = SuggestedWorkout
+        fields = [
+            'id', 'athlete', 'athlete_name',
+            'workout_type', 'name', 'description',
+            'target_value', 'target_unit', 'intensity', 'estimated_duration',
+            'reasoning', 'benefit',
+            'status', 'actual_log', 'actual_log_details',
+            'suggested_at', 'added_at', 'completed_at'
+        ]
+        read_only_fields = [
+            'athlete', 'athlete_name', 'actual_log', 'actual_log_details',
+            'suggested_at', 'added_at', 'completed_at'
+        ]
+    
+    def get_actual_log_details(self, obj):
+        if obj.actual_log:
+            return {
+                'id': obj.actual_log.id,
+                'date': obj.actual_log.date,
+                'distance': obj.actual_log.distance,
+                'duration': obj.actual_log.duration
+            }
+        return None
