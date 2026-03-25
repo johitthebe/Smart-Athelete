@@ -32,12 +32,11 @@ def register_api(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+from django.contrib.auth import authenticate, login as auth_login
+
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def login_api(request):
-    """
-    Login an existing user with username and password.
-    """
     username = request.data.get("username")
     password = request.data.get("password")
 
@@ -47,13 +46,16 @@ def login_api(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    user = authenticate(username=username, password=password)
+    user = authenticate(request, username=username, password=password)
 
     if not user:
         return Response(
             {"error": "Invalid credentials"},
             status=status.HTTP_401_UNAUTHORIZED,
         )
+
+    # Create session so subsequent requests are authenticated
+    auth_login(request, user)
 
     return Response(
         {

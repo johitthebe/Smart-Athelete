@@ -26,10 +26,37 @@ class User(AbstractUser):
         }
     )
     
+    # Coach capacity management
+    accepting_requests = models.BooleanField(
+        default=True,
+        help_text="Whether coach is accepting new athlete requests"
+    )
+    max_athletes = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="Maximum number of athletes this coach can handle"
+    )
+    paused_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When coach paused accepting requests"
+    )
+    pause_reason = models.TextField(
+        blank=True,
+        help_text="Reason for pausing requests"
+    )
+    
     class Meta:
         # Ensure email is unique at database level
         constraints = [
             models.UniqueConstraint(fields=['email'], name='unique_email')
+        ]
+        indexes = [
+            models.Index(
+                fields=['role', 'accepting_requests'],
+                name='coach_accepting_idx',
+                condition=models.Q(role='coach', accepting_requests=True)
+            ),
         ]
 
 
@@ -75,6 +102,12 @@ class CoachApproval(models.Model):
 
 class CoachAthleteAssignment(models.Model):
     """Model to manage coach-athlete assignments"""
+    ENDED_BY_CHOICES = (
+        ('coach', 'Coach'),
+        ('athlete', 'Athlete'),
+        ('admin', 'Admin'),
+    )
+    
     coach = models.ForeignKey(
         User, 
         on_delete=models.CASCADE, 
@@ -87,16 +120,30 @@ class CoachAthleteAssignment(models.Model):
         related_name='assigned_coaches',
         limit_choices_to={'role': 'athlete'}
     )
+    request = models.ForeignKey(
+        'CoachRequest',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assignment',
+        help_text="Original request that created this assignment"
+    )
     assigned_by = models.ForeignKey(
         User, 
         on_delete=models.SET_NULL, 
-        null=True, 
+        null=True,
+        blank=True,
         related_name='assignments_made',
         limit_choices_to={'role': 'admin'}
     )
     assigned_at = models.DateTimeField(auto_now_add=True)
     is_active = models.BooleanField(default=True)
     notes = models.TextField(blank=True, help_text="Admin notes about this assignment")
+    
+    # End tracking
+    ended_at = models.DateTimeField(null=True, blank=True)
+    ended_by = models.CharField(max_length=20, choices=ENDED_BY_CHOICES, null=True, blank=True)
+    end_reason = models.TextField(blank=True, help_text="Reason for ending assignment")
     
     class Meta:
         ordering = ['-assigned_at']

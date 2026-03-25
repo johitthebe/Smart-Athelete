@@ -301,13 +301,20 @@ class CoachFeedbackViewSet(viewsets.ModelViewSet):
         
         if user.role == 'coach':
             # Coaches see feedback they've given
-            return CoachFeedback.objects.filter(coach=user).select_related('athlete', 'goal', 'performance_log')
+            queryset = CoachFeedback.objects.filter(coach=user).select_related('athlete', 'goal', 'performance_log')
         elif user.role == 'athlete':
             # Athletes see feedback they've received
-            return CoachFeedback.objects.filter(athlete=user).select_related('coach', 'goal', 'performance_log')
+            queryset = CoachFeedback.objects.filter(athlete=user).select_related('coach', 'goal', 'performance_log')
         else:
             # Admins see all feedback
-            return CoachFeedback.objects.all().select_related('coach', 'athlete', 'goal', 'performance_log')
+            queryset = CoachFeedback.objects.all().select_related('coach', 'goal', 'performance_log')
+        
+        # Support filtering by athlete ID (for coaches viewing specific athlete's feedback)
+        athlete_id = self.request.query_params.get('athlete')
+        if athlete_id and user.role == 'coach':
+            queryset = queryset.filter(athlete_id=athlete_id)
+        
+        return queryset
     
     def create(self, request, *args, **kwargs):
         """Create new feedback - only coaches can create"""

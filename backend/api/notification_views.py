@@ -1,8 +1,10 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from .notification_models import Notification
 from .notification_serializers import NotificationSerializer
+from .notification_utils import check_and_send_performance_reminders
 
 
 class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
@@ -49,4 +51,28 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
         return Response({
             'message': f'{updated} notifications marked as read',
             'count': updated
+        })
+
+
+class SendPerformanceRemindersView(APIView):
+    """
+    POST /api/notifications/send-performance-reminders/
+    Trigger sending performance reminders to inactive athletes
+    (Admin only)
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self, request):
+        # Only allow admins to trigger this
+        if request.user.role != 'admin':
+            return Response(
+                {"error": "Only admins can trigger performance reminders"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        notifications_sent = check_and_send_performance_reminders()
+        
+        return Response({
+            'message': f'Successfully sent {notifications_sent} performance reminders',
+            'count': notifications_sent
         })

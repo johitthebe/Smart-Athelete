@@ -24,7 +24,7 @@ class CoachCredentialSerializer(serializers.ModelSerializer):
         model = CoachCredential
         fields = ['id', 'coach', 'coach_name', 'credential_type', 'credential_name', 
                   'issuing_organization', 'issue_date', 'file', 'file_url', 'uploaded_at']
-        read_only_fields = ['id', 'coach', 'uploaded_at', 'file_url', 'coach_name']
+        read_only_fields = ['id', 'uploaded_at', 'file_url', 'coach_name']
     
     def get_file_url(self, obj):
         request = self.context.get('request')

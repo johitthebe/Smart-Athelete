@@ -1,5 +1,5 @@
 from django.urls import path, include
-from rest_framework.routers import DefaultRouter
+from rest_framework.routers import SimpleRouter
 from . import views
 from .admin_views import (
     AdminUserViewSet,
@@ -25,18 +25,18 @@ from .coach_views import (
     delete_credential,
     coach_status
 )
-from .notification_views import NotificationViewSet
+from .notification_views import NotificationViewSet, SendPerformanceRemindersView
 
 # Create router for viewsets
-router = DefaultRouter()
+router = SimpleRouter()
 router.register(r'notifications', NotificationViewSet, basename='notification')
 
 urlpatterns = [
-    # Router URLs
-    path('', include(router.urls)),
-    
     # CSRF token
     path("csrf/", views.get_csrf, name="get-csrf"),
+    
+    # Notification endpoints
+    path("notifications/send-performance-reminders/", SendPerformanceRemindersView.as_view(), name="send-performance-reminders"),
     
     # Auth endpoints
     path("auth/register/", views.register_api, name="register"),
@@ -103,6 +103,6 @@ urlpatterns = [
     # Debug endpoints (admin only)
     path("admin/debug/coach-status/", AdminDebugCoachStatusView.as_view(), name='admin-debug-coach-status'),
     
-    # Performance endpoints
-    path("", include("performance.urls")),
-]
+    # Performance endpoints - removed to avoid conflict with main urls.py
+    # Performance is mounted at /api/performance/ in backend/urls.py
+] + router.urls

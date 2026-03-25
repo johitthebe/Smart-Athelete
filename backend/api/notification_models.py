@@ -14,6 +14,7 @@ class Notification(models.Model):
         ('coach_assigned', 'Coach Assigned'),
         ('message_received', 'Message Received'),
         ('report_reviewed', 'Report Reviewed'),
+        ('performance_reminder', 'Performance Reminder'),
     )
     
     user = models.ForeignKey(

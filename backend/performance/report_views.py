@@ -1,9 +1,13 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.db.models import Q
+from rest_framework.views import APIView
+from django.db.models import Q, Avg, Sum, Count
+from django.utils import timezone
+from datetime import timedelta
 from .report_models import PerformanceReport
 from .report_serializers import PerformanceReportSerializer, PerformanceReportListSerializer
+from .models import PerformanceLog
 
 
 class PerformanceReportViewSet(viewsets.ModelViewSet):
@@ -157,3 +161,85 @@ class PerformanceReportViewSet(viewsets.ModelViewSet):
             })
         
         return Response(coaches)
+
+
+class PerformanceAnalyticsView(APIView):
+    """
+    Returns analytics data for the authenticated athlete based on time range.
+    Query param: range = week | month | year
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        range_param = request.query_params.get('range', 'month')
+
+        now = timezone.now().date()
+        if range_param == 'week':
+            start_date = now - timedelta(days=7)
+        elif range_param == 'year':
+            start_date = now - timedelta(days=365)
+        else:
+            start_date = now - timedelta(days=30)
+
+        logs = PerformanceLog.objects.filter(
+            athlete=request.user,
+            date__gte=start_date,
+        ).select_related('activity_type').order_by('date')
+
+        total_sessions = logs.count()
+
+        if total_sessions == 0:
+            return Response({
+                'total_sessions': 0,
+                'avg_intensity': 0,
+                'total_distance': 0,
+                'improvement_rate': 0,
+                'progress_data': [],
+                'activity_breakdown': [],
+            })
+
+        agg = logs.aggregate(
+            avg_intensity=Avg('intensity'),
+            total_distance=Sum('distance'),
+        )
+
+        # Progress data: one point per log (date + distance or duration as value)
+        progress_data = []
+        for log in logs:
+            value = float(log.distance or 0) or float(log.duration or 0) / 60
+            progress_data.append({'date': str(log.date), 'value': round(value, 2)})
+
+        # Improvement rate: compare first half vs second half avg value
+        half = total_sessions // 2
+        if half > 0:
+            first_vals = [p['value'] for p in progress_data[:half]]
+            second_vals = [p['value'] for p in progress_data[half:]]
+            first_avg = sum(first_vals) / len(first_vals) if first_vals else 0
+            second_avg = sum(second_vals) / len(second_vals) if second_vals else 0
+            improvement = ((second_avg - first_avg) / first_avg * 100) if first_avg else 0
+        else:
+            improvement = 0
+
+        # Activity breakdown
+        activity_agg = (
+            logs.values('activity_type__name')
+            .annotate(count=Count('id'), avg_intensity=Avg('intensity'))
+            .order_by('-count')
+        )
+        activity_breakdown = [
+            {
+                'name': item['activity_type__name'] or 'Unknown',
+                'count': item['count'],
+                'avg_intensity': round(float(item['avg_intensity'] or 0), 2),
+            }
+            for item in activity_agg
+        ]
+
+        return Response({
+            'total_sessions': total_sessions,
+            'avg_intensity': round(float(agg['avg_intensity'] or 0), 2),
+            'total_distance': round(float(agg['total_distance'] or 0), 2),
+            'improvement_rate': round(improvement, 2),
+            'progress_data': progress_data,
+            'activity_breakdown': activity_breakdown,
+        })

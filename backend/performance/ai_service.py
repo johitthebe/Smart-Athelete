@@ -213,19 +213,16 @@ Activity Breakdown (Last 30 Days):
 Recent Workout History (Last 15 Sessions):
 {json.dumps(data['recent_workouts'], indent=2)}
 
-Based on THIS SPECIFIC ATHLETE'S data, suggest 3 SMART goals for the next 4-8 weeks:
+Based on THIS SPECIFIC ATHLETE'S data, suggest 3 SMART goals for the next 4-8 weeks.
+The athlete trains multiple sports - suggest goals across DIFFERENT activities where possible.
+Do NOT default to running unless it is the only activity logged.
+
 1. CONSERVATIVE: Safe, achievable goal based on current performance
 2. RECOMMENDED: Optimal challenge level considering improvement rate and consistency
 3. AMBITIOUS: Stretch goal that pushes limits but remains realistic
 
-IMPORTANT: Tailor suggestions to THIS athlete's specific:
-- Training frequency ({data['training_frequency']} sessions/week)
-- Improvement trend ({data['improvement_rate']}% rate)
-- Consistency level ({data['consistency_score']}/10)
-- How they feel during workouts (check recent_workouts feelings)
-
 For each goal, provide:
-- Event/Activity type (use their most common activity)
+- Event/Activity type (match to their logged activities - use variety if they train multiple sports)
 - Target value and unit (be specific, use their personal bests as baseline)
 - Deadline (in weeks, adjust based on their improvement rate)
 - Reasoning (explain WHY this goal fits THIS athlete's data)
@@ -314,33 +311,33 @@ Different athletes get DIFFERENT suggestions based on THEIR data - a consistent 
         goals_data = [
             {
                 'difficulty_level': 'conservative',
-                'event': 'Running',
+                'event': 'Cardio',
                 'target_value': 10.0,
                 'unit': 'km',
                 'deadline_weeks': 4,
                 'reasoning': 'Start with a manageable distance goal to build consistency and confidence',
-                'training_required': '3 runs per week, gradually increasing distance by 10% each week',
+                'training_required': '3 sessions per week, gradually increasing distance by 10% each week',
                 'key_tip': 'Focus on completing the distance, not speed. Walk breaks are perfectly fine!'
             },
             {
                 'difficulty_level': 'recommended',
-                'event': 'Running',
-                'target_value': 15.0,
-                'unit': 'km',
+                'event': 'Endurance',
+                'target_value': 30.0,
+                'unit': 'minutes',
                 'deadline_weeks': 6,
                 'reasoning': 'Build endurance with a moderate challenge that establishes a solid base',
-                'training_required': '3-4 runs per week with one longer run on weekends',
+                'training_required': '3-4 sessions per week with one longer session on weekends',
                 'key_tip': 'Include rest days for recovery - your body gets stronger during rest, not during workouts'
             },
             {
                 'difficulty_level': 'ambitious',
-                'event': 'Running',
-                'target_value': 25.0,
-                'unit': 'km',
+                'event': 'Fitness',
+                'target_value': 5.0,
+                'unit': 'sessions/week',
                 'deadline_weeks': 8,
-                'reasoning': 'Push your limits with a challenging distance goal that builds serious endurance',
-                'training_required': '4-5 runs per week with progressive overload and one long run',
-                'key_tip': 'Listen to your body and adjust if needed. Consistency beats intensity for beginners'
+                'reasoning': 'Build a consistent training habit across any activity you enjoy',
+                'training_required': 'Gradually increase from 3 to 5 sessions per week over 8 weeks',
+                'key_tip': 'Pick activities you enjoy — consistency matters more than the specific sport'
             }
         ]
         
@@ -566,21 +563,21 @@ Different athletes get DIFFERENT workouts - a tired athlete needs recovery, a fr
         workouts_data = [
             {
                 'workout_type': 'recovery',
-                'name': 'Easy Welcome Run',
-                'description': 'Start with a comfortable 20-minute easy run. Focus on enjoying the movement, not speed. You should be able to hold a conversation throughout.',
-                'target_value': 3.0,
-                'target_unit': 'km',
+                'name': 'Easy Movement Session',
+                'description': 'Choose any low-intensity activity (walk, light jog, cycling, swimming). Focus on enjoying the movement, not speed. You should be able to hold a conversation throughout.',
+                'target_value': 20.0,
+                'target_unit': 'minutes',
                 'intensity': 'easy',
                 'estimated_duration': 20,
                 'reasoning': 'Build base fitness with low-stress activity that your body can handle easily',
-                'benefit': 'Improves cardiovascular health, running form, and builds the habit of regular exercise'
+                'benefit': 'Improves cardiovascular health and builds the habit of regular exercise'
             },
             {
                 'workout_type': 'endurance',
-                'name': 'Steady State Builder',
-                'description': 'Run at a conversational pace for 30 minutes. You should be able to talk in full sentences. If you can\'t, slow down!',
-                'target_value': 5.0,
-                'target_unit': 'km',
+                'name': 'Steady Aerobic Builder',
+                'description': 'Pick your preferred activity (running, cycling, swimming, rowing) and maintain a steady conversational pace for 30 minutes.',
+                'target_value': 30.0,
+                'target_unit': 'minutes',
                 'intensity': 'moderate',
                 'estimated_duration': 30,
                 'reasoning': 'Develop aerobic capacity which is the foundation of all endurance sports',
@@ -588,14 +585,14 @@ Different athletes get DIFFERENT workouts - a tired athlete needs recovery, a fr
             },
             {
                 'workout_type': 'intervals',
-                'name': 'Intro to Speed',
-                'description': '5 min warmup jog, then 5 rounds of (2 min faster pace, 2 min easy recovery), finish with 5 min cooldown jog',
-                'target_value': 4.0,
-                'target_unit': 'km',
+                'name': 'Intro to Intensity',
+                'description': '5 min warmup, then 5 rounds of (2 min faster pace, 2 min easy recovery), finish with 5 min cooldown. Works for any cardio activity.',
+                'target_value': 25.0,
+                'target_unit': 'minutes',
                 'intensity': 'hard',
                 'estimated_duration': 25,
-                'reasoning': 'Introduce speed work safely with equal work-to-rest ratio',
-                'benefit': 'Improves running economy, speed, and teaches your body to handle higher intensities'
+                'reasoning': 'Introduce intensity safely with equal work-to-rest ratio',
+                'benefit': 'Improves cardiovascular fitness and teaches your body to handle higher intensities'
             }
         ]
         
@@ -630,7 +627,10 @@ Different athletes get DIFFERENT workouts - a tired athlete needs recovery, a fr
         else:
             recovery_emphasis = False
         
-        avg_distance = data.get('activity_summary', {}).get('Running', {}).get('avg_distance', 5.0)
+        avg_distance = 5.0
+        if data.get('activity_summary'):
+            most_common = max(data['activity_summary'].items(), key=lambda x: x[1]['count'])
+            avg_distance = most_common[1].get('avg_distance', 5.0) or 5.0
         
         workouts_data = [
             {

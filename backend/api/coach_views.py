@@ -72,7 +72,6 @@ def upload_credential(request):
     
     # Create credential
     credential_data = {
-        'coach': user.id,
         'credential_type': request.data.get('credential_type'),
         'credential_name': request.data.get('credential_name'),
         'issuing_organization': request.data.get('issuing_organization'),
@@ -82,7 +81,8 @@ def upload_credential(request):
     
     serializer = CoachCredentialSerializer(data=credential_data, context={'request': request})
     if serializer.is_valid():
-        credential = serializer.save()
+        # Save with coach explicitly set
+        credential = serializer.save(coach=user)
         
         # Check if this is first upload or resubmission
         credential_count = user.credentials.count()
