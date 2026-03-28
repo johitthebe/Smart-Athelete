@@ -15,7 +15,8 @@ from .coach_request_views import (
     CoachCapacityView,
     CoachPauseRequestsView,
     CoachResumeRequestsView,
-    MyAthletesView
+    MyAthletesView,
+    MyCoachesView
 )
 from .coach_dashboard_views import CoachDashboardStatsView
 
@@ -39,4 +40,7 @@ urlpatterns = [
     path("coaches/resume-requests/", CoachResumeRequestsView.as_view(), name="coach_resume_requests"),
     path("coaches/my-athletes/", MyAthletesView.as_view(), name="my_athletes"),
     path("coaches/dashboard-stats/", CoachDashboardStatsView.as_view(), name="coach_dashboard_stats"),
+    
+    # Athlete endpoints
+    path("athlete/my-coaches/", MyCoachesView.as_view(), name="my_coaches"),
 ] + router.urls

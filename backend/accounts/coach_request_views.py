@@ -427,3 +427,38 @@ def check_auto_pause(coach):
             athlete_count=current_count,
             reason=f'Reached max capacity: {coach.max_athletes}'
         )
+
+
+class MyCoachesView(APIView):
+    """GET /api/athlete/my-coaches/ - Get athlete's assigned coaches"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request):
+        if request.user.role != 'athlete':
+            return Response(
+                {"error": "Only athletes can view their coaches"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        assignments = CoachAthleteAssignment.objects.filter(
+            athlete=request.user,
+            is_active=True
+        ).select_related('coach').order_by('-assigned_at')
+        
+        # Create serializer data manually
+        coaches_data = []
+        for assignment in assignments:
+            coaches_data.append({
+                'id': assignment.id,
+                'coach': assignment.coach.id,
+                'coach_name': assignment.coach.get_full_name() or assignment.coach.username,
+                'coach_username': assignment.coach.username,
+                'coach_email': assignment.coach.email,
+                'assigned_at': assignment.assigned_at,
+                'notes': assignment.notes
+            })
+        
+        return Response({
+            "count": len(coaches_data),
+            "coaches": coaches_data
+        })

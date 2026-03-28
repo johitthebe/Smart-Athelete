@@ -26,11 +26,14 @@ class MessageViewSet(viewsets.ModelViewSet):
     
     def create(self, request, *args, **kwargs):
         """Send a new message"""
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        
-        # Validate recipient
+        # Validate recipient before serializer validation
         recipient_id = request.data.get('recipient')
+        if not recipient_id:
+            return Response(
+                {"error": "Recipient is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
         try:
             from django.contrib.auth import get_user_model
             User = get_user_model()
@@ -39,6 +42,12 @@ class MessageViewSet(viewsets.ModelViewSet):
             # Check if users can message each other
             # Coaches can message their athletes, athletes can message their coaches
             if request.user.role == 'coach':
+                # Recipient must be an athlete
+                if recipient.role != 'athlete':
+                    return Response(
+                        {"error": "Coaches can only message athletes"},
+                        status=status.HTTP_403_FORBIDDEN
+                    )
                 # Check if athlete is assigned to this coach
                 from accounts.models import CoachAthleteAssignment
                 if not CoachAthleteAssignment.objects.filter(
@@ -51,6 +60,12 @@ class MessageViewSet(viewsets.ModelViewSet):
                         status=status.HTTP_403_FORBIDDEN
                     )
             elif request.user.role == 'athlete':
+                # Recipient must be a coach
+                if recipient.role != 'coach':
+                    return Response(
+                        {"error": "Athletes can only message coaches"},
+                        status=status.HTTP_403_FORBIDDEN
+                    )
                 # Check if coach is assigned to this athlete
                 from accounts.models import CoachAthleteAssignment
                 if not CoachAthleteAssignment.objects.filter(
@@ -73,6 +88,9 @@ class MessageViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
         
+        # Now validate and create the message
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
@@ -129,11 +147,44 @@ class MessageViewSet(viewsets.ModelViewSet):
         """Reply to a message"""
         parent_message = self.get_object()
         
+        # Validate that the user can reply (must be sender or recipient of parent)
+        if request.user not in [parent_message.sender, parent_message.recipient]:
+            return Response(
+                {"error": "You can only reply to messages you're involved in"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Determine the recipient (the other person in the conversation)
+        recipient = parent_message.sender if request.user == parent_message.recipient else parent_message.recipient
+        
+        # Validate assignment still exists
+        from accounts.models import CoachAthleteAssignment
+        if request.user.role == 'coach':
+            if not CoachAthleteAssignment.objects.filter(
+                coach=request.user,
+                athlete=recipient,
+                is_active=True
+            ).exists():
+                return Response(
+                    {"error": "You can no longer message this athlete (assignment ended)"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        elif request.user.role == 'athlete':
+            if not CoachAthleteAssignment.objects.filter(
+                coach=recipient,
+                athlete=request.user,
+                is_active=True
+            ).exists():
+                return Response(
+                    {"error": "You can no longer message this coach (assignment ended)"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        
         # Create reply
         data = request.data.copy()
         data['parent_message'] = parent_message.id
-        data['recipient'] = parent_message.sender.id
-        data['subject'] = f"Re: {parent_message.subject}"
+        data['recipient'] = recipient.id
+        data['subject'] = f"Re: {parent_message.subject}" if not parent_message.subject.startswith("Re: ") else parent_message.subject
         
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
@@ -158,6 +209,39 @@ class MessageViewSet(viewsets.ModelViewSet):
             return Response(
                 {"error": "user_id parameter is required"},
                 status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            other_user = User.objects.get(id=other_user_id)
+            
+            # Validate assignment exists
+            from accounts.models import CoachAthleteAssignment
+            if request.user.role == 'coach':
+                if not CoachAthleteAssignment.objects.filter(
+                    coach=request.user,
+                    athlete=other_user,
+                    is_active=True
+                ).exists():
+                    return Response(
+                        {"error": "You can only view conversations with your assigned athletes"},
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+            elif request.user.role == 'athlete':
+                if not CoachAthleteAssignment.objects.filter(
+                    coach=other_user,
+                    athlete=request.user,
+                    is_active=True
+                ).exists():
+                    return Response(
+                        {"error": "You can only view conversations with your assigned coaches"},
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+        except User.DoesNotExist:
+            return Response(
+                {"error": "User not found"},
+                status=status.HTTP_404_NOT_FOUND
             )
         
         messages = self.get_queryset().filter(
