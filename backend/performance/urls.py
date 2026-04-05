@@ -13,6 +13,7 @@ from .views import (
 from .ai_views import AIGoalSuggestionViewSet, AIWorkoutSuggestionViewSet
 from .report_views import PerformanceReportViewSet, PerformanceAnalyticsView
 from .message_views import MessageViewSet
+from .analytics_views import DetailedAnalyticsView
 
 router = SimpleRouter()
 router.register(r'goals', GoalViewSet, basename='goal')
@@ -29,5 +30,6 @@ urlpatterns = [
     path('benchmark-comparison/', BenchmarkComparisonView.as_view(), name='benchmark-comparison'),
     path('admin/stats/', AdminStatsView.as_view(), name='admin-stats'),
     path('analytics/', PerformanceAnalyticsView.as_view(), name='performance-analytics'),
+    path('detailed-analytics/', DetailedAnalyticsView.as_view(), name='detailed-analytics'),
 ] + router.urls
 

@@ -3,10 +3,13 @@ from rest_framework.routers import SimpleRouter
 from .views import (
     register_api, 
     login_api,
+    logout_api,
+    me,
     CoachCredentialUploadView,
     CoachCredentialListView,
     CoachCredentialDeleteView,
-    CoachStatusView
+    CoachStatusView,
+    change_password
 )
 from .password_reset_views import request_password_reset, reset_password
 from .coach_request_views import (
@@ -26,6 +29,9 @@ router.register(r'coach-requests', CoachRequestViewSet, basename='coach-request'
 urlpatterns = [
     path("register/", register_api, name="register_api"),
     path("login/", login_api, name="login_api"),
+    path("logout/", logout_api, name="logout_api"),
+    path("me/", me, name="me"),
+    path("change-password/", change_password, name="change_password"),
     path("password-reset/request/", request_password_reset, name="password_reset_request"),
     path("password-reset/confirm/", reset_password, name="password_reset_confirm"),
     path("coach/credentials/", CoachCredentialUploadView.as_view(), name="coach_credential_upload"),

@@ -80,10 +80,10 @@ from .feedback_models import CoachFeedback
 
 @admin.register(CoachFeedback)
 class CoachFeedbackAdmin(admin.ModelAdmin):
-    list_display = ['coach', 'athlete', 'feedback_type', 'title', 'is_read', 'created_at']
-    list_filter = ['feedback_type', 'is_read', 'created_at']
+    list_display = ['coach', 'athlete', 'feedback_type', 'title', 'is_read', 'is_acknowledged', 'created_at']
+    list_filter = ['feedback_type', 'is_read', 'is_acknowledged', 'created_at']
     search_fields = ['coach__username', 'athlete__username', 'title', 'message']
-    readonly_fields = ['created_at', 'updated_at', 'read_at']
+    readonly_fields = ['created_at', 'updated_at', 'read_at', 'acknowledged_at']
     date_hierarchy = 'created_at'
     
     fieldsets = (
@@ -95,7 +95,7 @@ class CoachFeedbackAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
         ('Status', {
-            'fields': ('is_read', 'read_at')
+            'fields': ('is_read', 'read_at', 'is_acknowledged', 'acknowledged_at')
         }),
         ('Timestamps', {
             'fields': ('created_at', 'updated_at'),

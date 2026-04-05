@@ -1,8 +1,8 @@
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
-from django.contrib.auth import authenticate
+from django.contrib.auth import authenticate, update_session_auth_hash
 from .serializers import UserSerializer
 
 
@@ -228,3 +228,68 @@ class CoachStatusView(APIView):
             approval = CoachApproval.objects.create(coach=request.user, status='pending')
             serializer = CoachApprovalSerializer(approval, context={'request': request})
             return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+
+@api_view(['GET', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def me(request):
+    """
+    Get or update current user profile
+    """
+    if request.method == 'GET':
+        serializer = UserSerializer(request.user)
+        return Response(serializer.data)
+    
+    elif request.method == 'PATCH':
+        serializer = UserSerializer(request.user, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def logout_api(request):
+    """
+    Logout user and clear session
+    """
+    from django.contrib.auth import logout
+    logout(request)
+    return Response({"message": "Logged out successfully"}, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def change_password(request):
+    """
+    Change user password
+    """
+    user = request.user
+    old_password = request.data.get('old_password')
+    new_password = request.data.get('new_password')
+
+    if not old_password or not new_password:
+        return Response(
+            {'error': 'Both old and new passwords are required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Check if old password is correct
+    if not user.check_password(old_password):
+        return Response(
+            {'error': 'Current password is incorrect'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Set new password
+    user.set_password(new_password)
+    user.save()
+
+    # Update session to prevent logout
+    update_session_auth_hash(request, user)
+
+    return Response({
+        'message': 'Password changed successfully'
+    })

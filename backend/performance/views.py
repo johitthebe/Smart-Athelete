@@ -323,6 +323,21 @@ class CoachFeedbackViewSet(viewsets.ModelViewSet):
                 {'error': 'Only coaches can provide feedback'},
                 status=status.HTTP_403_FORBIDDEN
             )
+        
+        # Validate athlete assignment before creating
+        athlete_id = request.data.get('athlete')
+        if athlete_id:
+            from accounts.models import CoachAthleteAssignment
+            if not CoachAthleteAssignment.objects.filter(
+                coach=request.user,
+                athlete_id=athlete_id,
+                is_active=True
+            ).exists():
+                return Response(
+                    {'error': 'You can only provide feedback to athletes assigned to you'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        
         return super().create(request, *args, **kwargs)
     
     @action(detail=False, methods=['get'])
@@ -358,6 +373,26 @@ class CoachFeedbackViewSet(viewsets.ModelViewSet):
             )
         
         feedback.mark_as_read()
+        serializer = self.get_serializer(feedback)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'])
+    def acknowledge(self, request, pk=None):
+        """Mark feedback as acknowledged - only for athletes"""
+        if request.user.role != 'athlete':
+            return Response(
+                {'error': 'Only athletes can acknowledge feedback'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        feedback = self.get_object()
+        if feedback.athlete != request.user:
+            return Response(
+                {'error': 'You can only acknowledge your own feedback'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        feedback.mark_as_acknowledged()
         serializer = self.get_serializer(feedback)
         return Response(serializer.data)
     

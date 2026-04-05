@@ -17,6 +17,10 @@ DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '127.0.0.1,localhost').split(',')
 
+# Disable APPEND_SLASH to prevent issues with POST requests without trailing slashes
+# Next.js proxy handles URL rewriting, and we want to avoid redirect issues with POST data
+APPEND_SLASH = False
+
 AUTH_USER_MODEL = "accounts.User"
 
 # Applications
@@ -161,7 +165,7 @@ USE_TZ = True
 # Static files
 STATIC_URL = "static/"
 
-LOGIN_REDIRECT_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000') + '/post-login'
+LOGIN_REDIRECT_URL = '/auth/post-login'
 LOGIN_URL = "/accounts/login"
 LOGOUT_REDIRECT_URL = "/"
 
@@ -200,3 +204,32 @@ FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
 GROQ_API_KEY = os.getenv('GROQ_API_KEY', '')
 if not GROQ_API_KEY:
     print("WARNING: GROQ_API_KEY not set. AI features will not work.")
+
+# Google OAuth Configuration
+SOCIALACCOUNT_PROVIDERS = {
+    'google': {
+        'APP': {
+            'client_id': os.getenv('GOOGLE_CLIENT_ID', ''),
+            'secret': os.getenv('GOOGLE_CLIENT_SECRET', ''),
+            'key': ''
+        },
+        'SCOPE': [
+            'profile',
+            'email',
+        ],
+        'AUTH_PARAMS': {
+            'access_type': 'online',
+        },
+        'VERIFIED_EMAIL': True,
+    }
+}
+
+# Allauth settings
+ACCOUNT_EMAIL_REQUIRED = True
+ACCOUNT_USERNAME_REQUIRED = True
+ACCOUNT_AUTHENTICATION_METHOD = 'username_email'
+ACCOUNT_EMAIL_VERIFICATION = 'none'  # Set to 'mandatory' in production
+SOCIALACCOUNT_AUTO_SIGNUP = True
+SOCIALACCOUNT_EMAIL_VERIFICATION = 'none'
+SOCIALACCOUNT_QUERY_EMAIL = True
+SOCIALACCOUNT_ADAPTER = 'accounts.adapters.CustomSocialAccountAdapter'
