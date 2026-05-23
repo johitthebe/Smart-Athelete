@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.contrib.auth import authenticate, update_session_auth_hash
 from .serializers import UserSerializer
+from .activity_utils import log_activity
 
 
 @api_view(["POST"])
@@ -15,6 +16,16 @@ def register_api(request):
     serializer = UserSerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.save()
+        
+        # Log activity
+        log_activity(
+            user=user,
+            action_type='user_registered',
+            description=f"{user.username} registered as {user.role}",
+            metadata={'role': user.role, 'email': user.email},
+            request=request
+        )
+        
         return Response(
             {
                 "message": "Registered successfully",
@@ -56,6 +67,15 @@ def login_api(request):
 
     # Create session so subsequent requests are authenticated
     auth_login(request, user)
+    
+    # Log activity
+    log_activity(
+        user=user,
+        action_type='user_login',
+        description=f"{user.username} logged in",
+        metadata={'role': user.role},
+        request=request
+    )
 
     return Response(
         {

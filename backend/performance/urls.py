@@ -14,6 +14,7 @@ from .ai_views import AIGoalSuggestionViewSet, AIWorkoutSuggestionViewSet
 from .report_views import PerformanceReportViewSet, PerformanceAnalyticsView
 from .message_views import MessageViewSet
 from .analytics_views import DetailedAnalyticsView
+from .tes_views import athlete_tes_analysis, my_athletes_tes_summary, my_tes_analysis
 
 router = SimpleRouter()
 router.register(r'goals', GoalViewSet, basename='goal')
@@ -31,5 +32,10 @@ urlpatterns = [
     path('admin/stats/', AdminStatsView.as_view(), name='admin-stats'),
     path('analytics/', PerformanceAnalyticsView.as_view(), name='performance-analytics'),
     path('detailed-analytics/', DetailedAnalyticsView.as_view(), name='detailed-analytics'),
+    
+    # Training Effectiveness Score (TES) endpoints
+    path('tes/athlete/<int:athlete_id>/', athlete_tes_analysis, name='athlete-tes-analysis'),
+    path('tes/my-athletes/', my_athletes_tes_summary, name='my-athletes-tes-summary'),
+    path('tes/my-analysis/', my_tes_analysis, name='my-tes-analysis'),
 ] + router.urls
 

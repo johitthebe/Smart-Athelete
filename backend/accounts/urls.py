@@ -22,6 +22,9 @@ from .coach_request_views import (
     MyCoachesView
 )
 from .coach_dashboard_views import CoachDashboardStatsView
+from .coach_detail_views import CoachDetailView, CoachReviewsView
+from .onboarding_views import create_profile, onboarding_status
+from .activity_views import activity_feed, activity_stats, user_activity_timeline
 
 router = SimpleRouter()
 router.register(r'coach-requests', CoachRequestViewSet, basename='coach-request')
@@ -41,6 +44,8 @@ urlpatterns = [
     
     # Coach request system
     path("coaches/available/", AvailableCoachesView.as_view(), name="available_coaches"),
+    path("coaches/<int:coach_id>/", CoachDetailView.as_view(), name="coach_detail"),
+    path("coaches/<int:coach_id>/reviews/", CoachReviewsView.as_view(), name="coach_reviews"),
     path("coaches/capacity-status/", CoachCapacityView.as_view(), name="coach_capacity_status"),
     path("coaches/pause-requests/", CoachPauseRequestsView.as_view(), name="coach_pause_requests"),
     path("coaches/resume-requests/", CoachResumeRequestsView.as_view(), name="coach_resume_requests"),
@@ -49,4 +54,13 @@ urlpatterns = [
     
     # Athlete endpoints
     path("athlete/my-coaches/", MyCoachesView.as_view(), name="my_coaches"),
+    
+    # Onboarding endpoints
+    path("onboarding/profile/", create_profile, name="onboarding_create_profile"),
+    path("onboarding/status/", onboarding_status, name="onboarding_status"),
+    
+    # Activity tracking endpoints
+    path("activities/feed/", activity_feed, name="activity_feed"),
+    path("activities/stats/", activity_stats, name="activity_stats"),
+    path("activities/user/<int:user_id>/", user_activity_timeline, name="user_activity_timeline"),
 ] + router.urls

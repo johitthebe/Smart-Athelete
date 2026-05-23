@@ -3,6 +3,7 @@
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 from .models import CoachCredential, CoachApproval, CoachAthleteAssignment
+from .activity_models import UserActivity
 
 User = get_user_model()
 
@@ -30,7 +31,6 @@ class CoachApprovalAdmin(admin.ModelAdmin):
     readonly_fields = ("created_at", "updated_at")
 
 
-
 @admin.register(CoachAthleteAssignment)
 class CoachAthleteAssignmentAdmin(admin.ModelAdmin):
     list_display = ("id", "coach", "athlete", "assigned_by", "assigned_at", "is_active")
@@ -38,3 +38,12 @@ class CoachAthleteAssignmentAdmin(admin.ModelAdmin):
     list_filter = ("is_active", "assigned_at")
     date_hierarchy = "assigned_at"
     readonly_fields = ("assigned_at",)
+
+
+@admin.register(UserActivity)
+class UserActivityAdmin(admin.ModelAdmin):
+    list_display = ("id", "user", "action_type", "description", "created_at")
+    search_fields = ("user__username", "user__email", "description")
+    list_filter = ("action_type", "created_at")
+    date_hierarchy = "created_at"
+    readonly_fields = ("created_at",)

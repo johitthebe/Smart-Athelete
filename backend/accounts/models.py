@@ -1,5 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from django.core.validators import MinValueValidator, MaxValueValidator
+from .activity_models import UserActivity
 
 class User(AbstractUser):
 
@@ -155,3 +157,130 @@ class CoachAthleteAssignment(models.Model):
     
     def __str__(self):
         return f"{self.coach.get_full_name()} → {self.athlete.get_full_name()}"
+
+
+class AthleteProfile(models.Model):
+    """Comprehensive athlete profile from onboarding wizard"""
+    
+    # Relationship
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='athlete_profile')
+    
+    # Step 1: Account & Profile
+    GENDER_CHOICES = (
+        ('male', 'Male'),
+        ('female', 'Female'),
+        ('other', 'Other'),
+        ('prefer_not_to_say', 'Prefer not to say'),
+    )
+    HEIGHT_UNIT_CHOICES = (
+        ('cm', 'Centimeters'),
+        ('ft', 'Feet'),
+    )
+    WEIGHT_UNIT_CHOICES = (
+        ('kg', 'Kilograms'),
+        ('lbs', 'Pounds'),
+    )
+    BODY_TYPE_CHOICES = (
+        ('ectomorph', 'Ectomorph'),
+        ('mesomorph', 'Mesomorph'),
+        ('endomorph', 'Endomorph'),
+        ('not_sure', 'Not Sure'),
+    )
+    
+    age = models.IntegerField(validators=[MinValueValidator(13), MaxValueValidator(120)])
+    gender = models.CharField(max_length=20, choices=GENDER_CHOICES)
+    height = models.FloatField(validators=[MinValueValidator(0.1)])
+    height_unit = models.CharField(max_length=5, choices=HEIGHT_UNIT_CHOICES, default='cm')
+    weight = models.FloatField(validators=[MinValueValidator(0.1)])
+    weight_unit = models.CharField(max_length=5, choices=WEIGHT_UNIT_CHOICES, default='kg')
+    body_type = models.CharField(max_length=20, choices=BODY_TYPE_CHOICES)
+    
+    # Step 2: Fitness Background
+    FITNESS_LEVEL_CHOICES = (
+        ('beginner', 'Beginner'),
+        ('intermediate', 'Intermediate'),
+        ('advanced', 'Advanced'),
+        ('elite', 'Elite'),
+    )
+    
+    fitness_level = models.CharField(max_length=20, choices=FITNESS_LEVEL_CHOICES)
+    primary_sport = models.CharField(max_length=100)
+    years_training = models.FloatField(validators=[MinValueValidator(0)])
+    current_performance_baseline = models.TextField()
+    
+    # Step 3: Goals
+    PRIMARY_GOAL_CHOICES = (
+        ('weight_loss', 'Weight Loss'),
+        ('muscle_gain', 'Muscle Gain'),
+        ('endurance', 'Endurance'),
+        ('strength', 'Strength'),
+        ('speed', 'Speed'),
+        ('flexibility', 'Flexibility'),
+        ('general_fitness', 'General Fitness'),
+    )
+    GOAL_TIMEFRAME_CHOICES = (
+        ('1_month', '1 Month'),
+        ('3_months', '3 Months'),
+        ('6_months', '6 Months'),
+        ('1_year', '1 Year'),
+        ('ongoing', 'Ongoing'),
+    )
+    
+    primary_goal = models.CharField(max_length=20, choices=PRIMARY_GOAL_CHOICES)
+    goal_timeframe = models.CharField(max_length=20, choices=GOAL_TIMEFRAME_CHOICES)
+    target_event = models.CharField(max_length=200, blank=True)
+    target_event_date = models.DateField(null=True, blank=True)
+    
+    # Step 4: Training Preferences
+    INTENSITY_CHOICES = (
+        ('low', 'Low'),
+        ('moderate', 'Moderate'),
+        ('high', 'High'),
+        ('varied', 'Varied'),
+    )
+    TRAINING_TIME_CHOICES = (
+        ('morning', 'Morning'),
+        ('afternoon', 'Afternoon'),
+        ('evening', 'Evening'),
+        ('flexible', 'Flexible'),
+    )
+    
+    weekly_availability = models.IntegerField(validators=[MinValueValidator(1), MaxValueValidator(7)])
+    preferred_intensity = models.CharField(max_length=20, choices=INTENSITY_CHOICES)
+    preferred_training_time = models.CharField(max_length=20, choices=TRAINING_TIME_CHOICES)
+    equipment_access = models.JSONField(default=list)
+    
+    # Step 5: Health & Motivation
+    ACTIVITY_LEVEL_CHOICES = (
+        ('sedentary', 'Sedentary'),
+        ('lightly_active', 'Lightly Active'),
+        ('moderately_active', 'Moderately Active'),
+        ('very_active', 'Very Active'),
+        ('extremely_active', 'Extremely Active'),
+    )
+    GUIDANCE_PREFERENCE_CHOICES = (
+        ('self_directed', 'Self Directed'),
+        ('structured_plan', 'Structured Plan'),
+        ('coach_guided', 'Coach Guided'),
+    )
+    
+    injury_history = models.TextField(blank=True)
+    medical_conditions = models.TextField(blank=True)
+    current_activity_level = models.CharField(max_length=20, choices=ACTIVITY_LEVEL_CHOICES)
+    motivation_level = models.IntegerField(validators=[MinValueValidator(1), MaxValueValidator(10)])
+    guidance_preference = models.CharField(max_length=20, choices=GUIDANCE_PREFERENCE_CHOICES)
+    
+    # Timestamps
+    completed_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-completed_at']
+        indexes = [
+            models.Index(fields=['user']),
+            models.Index(fields=['fitness_level']),
+            models.Index(fields=['primary_goal']),
+        ]
+    
+    def __str__(self):
+        return f"Profile: {self.user.get_full_name()} - {self.fitness_level}"

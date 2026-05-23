@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.contrib.auth import get_user_model
 from django.db.models import Q
+from accounts.activity_utils import log_activity
 
 from .models import Goal, Benchmark, PerformanceLog, ActivityType
 from .feedback_models import CoachFeedback
@@ -36,6 +37,17 @@ class GoalViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Return only goals for the authenticated athlete"""
         return Goal.objects.filter(athlete=self.request.user).prefetch_related('logs')
+    
+    def perform_create(self, serializer):
+        """Create goal and log activity"""
+        goal = serializer.save()
+        log_activity(
+            user=self.request.user,
+            action_type='goal_created',
+            description=f"Created goal: {goal.name}",
+            metadata={'goal_id': goal.id, 'goal_name': goal.name, 'target_value': str(goal.target_value)},
+            request=self.request
+        )
 
     @action(detail=False, methods=["get"])
     def active(self, request):
@@ -66,6 +78,15 @@ class GoalViewSet(viewsets.ModelViewSet):
         goal = self.get_object()
         goal.status = "completed"
         goal.save()
+        
+        log_activity(
+            user=request.user,
+            action_type='goal_completed',
+            description=f"Completed goal: {goal.name}",
+            metadata={'goal_id': goal.id, 'goal_name': goal.name},
+            request=request
+        )
+        
         serializer = self.get_serializer(goal)
         return Response(serializer.data)
     
@@ -135,7 +156,24 @@ class PerformanceLogViewSet(viewsets.ModelViewSet):
                 'message': 'Create a goal first to start tracking your progress'
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        return super().create(request, *args, **kwargs)
+        response = super().create(request, *args, **kwargs)
+        
+        # Log activity if successful
+        if response.status_code == 201:
+            log_data = response.data
+            log_activity(
+                user=request.user,
+                action_type='performance_logged',
+                description=f"Logged workout: {log_data.get('activity_type_name', 'Unknown')}",
+                metadata={
+                    'log_id': log_data.get('id'),
+                    'activity_type': log_data.get('activity_type_name'),
+                    'goal_id': log_data.get('goal')
+                },
+                request=request
+            )
+        
+        return response
 
     @action(detail=False, methods=["get"])
     def by_event(self, request):

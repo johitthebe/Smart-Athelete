@@ -1,7 +1,4 @@
-"""
-AI Service for generating personalized goal and workout suggestions
-Uses Llama 3 8B via Groq API (cloud-based, super fast!)
-"""
+
 import json
 from datetime import datetime, timedelta
 from django.conf import settings
@@ -304,6 +301,170 @@ Different athletes get DIFFERENT suggestions based on THEIR data - a consistent 
         except (json.JSONDecodeError, KeyError) as e:
             print(f"Error parsing AI response: {e}")
             return cls._generate_fallback_goals(athlete, data)
+    
+    @classmethod
+    def generate_onboarding_goals(cls, athlete_profile):
+        """
+        Generate 3 personalized goal suggestions based on onboarding profile
+        Returns list of dicts (not SuggestedGoal objects) for onboarding flow
+        """
+        # Check if athlete has any recent performance data
+        athlete = athlete_profile.user
+        performance_data = cls._analyze_athlete_data(athlete)
+        has_performance_history = performance_data['total_workouts'] > 0
+        
+        # Build context from onboarding profile
+        context = f"""
+New Athlete Onboarding Profile:
+
+Personal Info:
+- Age: {athlete_profile.age}
+- Gender: {athlete_profile.get_gender_display()}
+- Height: {athlete_profile.height}{athlete_profile.height_unit}
+- Weight: {athlete_profile.weight}{athlete_profile.weight_unit}
+- Body Type: {athlete_profile.get_body_type_display()}
+
+Fitness Background:
+- Fitness Level: {athlete_profile.get_fitness_level_display()}
+- Primary Sport: {athlete_profile.primary_sport}
+- Years Training: {athlete_profile.years_training}
+- Current Performance: {athlete_profile.current_performance_baseline}
+
+Goals & Targets:
+- Primary Goal: {athlete_profile.get_primary_goal_display()}
+- Goal Timeframe: {athlete_profile.get_goal_timeframe_display()}
+- Target Event: {athlete_profile.target_event or 'None specified'}
+- Target Event Date: {athlete_profile.target_event_date or 'None specified'}
+
+Training Preferences:
+- Weekly Availability: {athlete_profile.weekly_availability} days
+- Preferred Intensity: {athlete_profile.get_preferred_intensity_display()}
+- Preferred Training Time: {athlete_profile.get_preferred_training_time_display()}
+- Equipment Access: {', '.join(athlete_profile.equipment_access) if athlete_profile.equipment_access else 'None specified'}
+
+Health & Motivation:
+- Current Activity Level: {athlete_profile.get_current_activity_level_display()}
+- Motivation Level: {athlete_profile.motivation_level}/10
+- Guidance Preference: {athlete_profile.get_guidance_preference_display()}
+- Injury History: {athlete_profile.injury_history or 'None'}
+- Medical Conditions: {athlete_profile.medical_conditions or 'None'}
+"""
+
+        # Add recent performance data if available
+        if has_performance_history:
+            context += f"""
+
+Recent Performance History (Last 30 Days):
+- Total Workouts: {performance_data['recent_workouts_count']}
+- Training Frequency: {performance_data['training_frequency']} sessions per week
+- Improvement Rate: {performance_data['improvement_rate']}%
+- Consistency Score: {performance_data['consistency_score']}/10
+
+Activity Summary:
+{json.dumps(performance_data['activity_summary'], indent=2)}
+
+Recent Workouts:
+{json.dumps(performance_data['recent_workouts'][:10], indent=2)}
+
+IMPORTANT: This athlete has logged workouts! Use their ACTUAL performance data to set realistic goals.
+Compare their stated "Current Performance Baseline" with their logged data to ensure accuracy.
+"""
+        else:
+            context += """
+
+Performance History:
+- No workouts logged yet (new athlete)
+- Base goals on their stated fitness level and current performance baseline
+"""
+
+        context += f"""
+
+Based on THIS ATHLETE'S complete profile, suggest 3 SMART goals for their first 4-12 weeks:
+
+1. CONSERVATIVE: Safe, achievable goal that builds confidence and habit
+2. RECOMMENDED: Optimal challenge level considering their fitness level and availability
+3. AMBITIOUS: Stretch goal that pushes limits but remains realistic for motivated athletes
+
+Consider:
+- Their fitness level ({athlete_profile.fitness_level}) - beginners need gentler progression
+- Their primary goal ({athlete_profile.primary_goal}) - align suggestions with what they want
+- Their weekly availability ({athlete_profile.weekly_availability} days) - realistic for their schedule
+- Their motivation level ({athlete_profile.motivation_level}/10) - higher motivation can handle more challenge
+- Their injury history and medical conditions - ensure safety
+- Their target event if specified
+{"- Their ACTUAL logged performance data - use real data over stated baseline" if has_performance_history else "- Their stated current performance baseline (no logged data yet)"}
+
+For each goal, provide:
+- Event/Activity type (match to their primary sport: {athlete_profile.primary_sport})
+- Target value and unit (realistic for their fitness level)
+- Deadline (in weeks, based on their goal timeframe)
+- Reasoning (explain WHY this goal fits THIS athlete's profile)
+- Training required (specific to their availability and preferences)
+- Key tip (personalized advice based on their profile)
+
+Format as JSON array with these exact fields:
+[
+  {{
+    "difficulty_level": "conservative",
+    "event": "...",
+    "target_value": 0.0,
+    "unit": "...",
+    "deadline_weeks": 0,
+    "reasoning": "...",
+    "training_required": "...",
+    "key_tip": "..."
+  }},
+  {{
+    "difficulty_level": "recommended",
+    "event": "...",
+    "target_value": 0.0,
+    "unit": "...",
+    "deadline_weeks": 0,
+    "reasoning": "...",
+    "training_required": "...",
+    "key_tip": "..."
+  }},
+  {{
+    "difficulty_level": "ambitious",
+    "event": "...",
+    "target_value": 0.0,
+    "unit": "...",
+    "deadline_weeks": 0,
+    "reasoning": "...",
+    "training_required": "...",
+    "key_tip": "..."
+  }}
+]
+
+Return ONLY the JSON array, no other text.
+"""
+        
+        system_prompt = """You are an expert sports coach AI specializing in onboarding new athletes.
+Create PERSONALIZED, achievable goals based on each athlete's unique profile.
+Consider their fitness level, goals, availability, motivation, and any health concerns.
+Be encouraging and realistic - help them start their fitness journey successfully.
+Goals should be SMART (Specific, Measurable, Achievable, Relevant, Time-bound)."""
+        
+        response = cls._call_llama(context, system_prompt)
+        
+        if not response:
+            # Use fallback if AI fails
+            from accounts.onboarding_views import _generate_fallback_goals
+            return _generate_fallback_goals(athlete_profile)
+        
+        # Parse AI response
+        try:
+            json_start = response.find('[')
+            json_end = response.rfind(']') + 1
+            if json_start >= 0 and json_end > json_start:
+                suggestions_data = json.loads(response[json_start:json_end])
+                
+                # Return as list of dicts (not database objects)
+                return suggestions_data[:3]
+        except (json.JSONDecodeError, KeyError) as e:
+            print(f"Error parsing AI response: {e}")
+            from accounts.onboarding_views import _generate_fallback_goals
+            return _generate_fallback_goals(athlete_profile)
     
     @classmethod
     def _generate_beginner_goals(cls, athlete):
