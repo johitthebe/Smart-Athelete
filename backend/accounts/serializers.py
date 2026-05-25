@@ -4,10 +4,18 @@ from datetime import date
 
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
+    profile_picture_url = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ["id", "username", "email", "password", "first_name", "last_name", "role"]
+        fields = ["id", "username", "email", "password", "first_name", "last_name", "role", "profile_picture", "profile_picture_url"]
+        read_only_fields = ["profile_picture_url"]
+
+    def get_profile_picture_url(self, obj):
+        request = self.context.get('request')
+        if obj.profile_picture and request:
+            return request.build_absolute_uri(obj.profile_picture.url)
+        return None
 
     def create(self, validated_data):
         password = validated_data.pop("password")

@@ -43,6 +43,96 @@ def register_api(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def upload_profile_picture(request):
+    """
+    Upload or update user profile picture
+    POST /api/auth/profile-picture/
+    """
+    if 'profile_picture' not in request.FILES:
+        return Response(
+            {"error": "No file provided"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    file = request.FILES['profile_picture']
+    
+    # Validate file type
+    allowed_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp']
+    file_ext = file.name.lower()[file.name.rfind('.'):]
+    if file_ext not in allowed_extensions:
+        return Response(
+            {"error": "Invalid file type. Please upload JPG, PNG, GIF, or WEBP"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Validate file size (5MB max)
+    if file.size > 5242880:
+        return Response(
+            {"error": "File size exceeds 5MB limit"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Delete old profile picture if exists
+    if request.user.profile_picture:
+        request.user.profile_picture.delete(save=False)
+    
+    # Save new profile picture
+    request.user.profile_picture = file
+    request.user.save()
+    
+    # Log activity
+    log_activity(
+        user=request.user,
+        action_type='profile_updated',
+        description=f"{request.user.username} updated profile picture",
+        metadata={'action': 'profile_picture_upload'},
+        request=request
+    )
+    
+    # Return updated user data
+    serializer = UserSerializer(request.user, context={'request': request})
+    return Response(
+        {
+            "message": "Profile picture updated successfully",
+            "user": serializer.data
+        },
+        status=status.HTTP_200_OK
+    )
+
+
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def delete_profile_picture(request):
+    """
+    Delete user profile picture
+    DELETE /api/auth/profile-picture/
+    """
+    if not request.user.profile_picture:
+        return Response(
+            {"error": "No profile picture to delete"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    
+    # Delete profile picture
+    request.user.profile_picture.delete(save=True)
+    
+    # Log activity
+    log_activity(
+        user=request.user,
+        action_type='profile_updated',
+        description=f"{request.user.username} deleted profile picture",
+        metadata={'action': 'profile_picture_delete'},
+        request=request
+    )
+    
+    return Response(
+        {"message": "Profile picture deleted successfully"},
+        status=status.HTTP_200_OK
+    )
+
+
 from django.contrib.auth import authenticate, login as auth_login
 
 @api_view(["POST"])

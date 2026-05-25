@@ -48,6 +48,14 @@ class User(AbstractUser):
         help_text="Reason for pausing requests"
     )
     
+    # Profile picture
+    profile_picture = models.ImageField(
+        upload_to='profile_pictures/',
+        null=True,
+        blank=True,
+        help_text="User profile picture"
+    )
+    
     class Meta:
         # Ensure email is unique at database level
         constraints = [
