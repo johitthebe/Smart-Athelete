@@ -87,7 +87,21 @@ class PerformanceReport(models.Model):
     def mark_reviewed(self, feedback=''):
         """Mark report as reviewed with optional feedback"""
         from django.utils import timezone
+        from api.notification_utils import create_notification
+        
         self.status = 'feedback_given' if feedback else 'reviewed'
         self.coach_feedback = feedback
         self.reviewed_at = timezone.now()
         self.save()
+        
+        # Create notification for athlete when coach reviews/gives feedback
+        if feedback:
+            coach_name = self.coach.get_full_name() or self.coach.username
+            create_notification(
+                user=self.athlete,
+                notification_type='report_reviewed',
+                title=f'Coach reviewed your report',
+                message=f'{coach_name} reviewed your report "{self.title}" and provided feedback',
+                link_type='report',
+                link_id=self.id
+            )

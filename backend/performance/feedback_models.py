@@ -53,6 +53,13 @@ class CoachFeedback(models.Model):
     is_acknowledged = models.BooleanField(default=False)
     acknowledged_at = models.DateTimeField(null=True, blank=True)
     
+    # Rating (1-5 stars, optional)
+    rating = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="Athlete's rating of the feedback (1-5 stars)"
+    )
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     

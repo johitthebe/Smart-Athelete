@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .report_models import PerformanceReport
 from django.contrib.auth import get_user_model
+from api.notification_utils import create_notification
 
 User = get_user_model()
 
@@ -26,7 +27,20 @@ class PerformanceReportSerializer(serializers.ModelSerializer):
         # Set athlete from request context
         request = self.context.get('request')
         validated_data['athlete'] = request.user
-        return super().create(validated_data)
+        report = super().create(validated_data)
+        
+        # Create notification for coach
+        athlete_name = request.user.get_full_name() or request.user.username
+        create_notification(
+            user=report.coach,
+            notification_type='report_reviewed',
+            title=f'New report from {athlete_name}',
+            message=f'{athlete_name} shared a performance report: "{report.title}"',
+            link_type='report',
+            link_id=report.id
+        )
+        
+        return report
 
 
 class PerformanceReportListSerializer(serializers.ModelSerializer):

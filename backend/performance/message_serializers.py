@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .message_models import Message
 from django.contrib.auth import get_user_model
+from api.notification_utils import create_notification
 
 User = get_user_model()
 
@@ -29,7 +30,20 @@ class MessageSerializer(serializers.ModelSerializer):
         # Set sender from request context
         request = self.context.get('request')
         validated_data['sender'] = request.user
-        return super().create(validated_data)
+        message = super().create(validated_data)
+        
+        # Create notification for recipient
+        sender_name = request.user.get_full_name() or request.user.username
+        create_notification(
+            user=message.recipient,
+            notification_type='message_received',
+            title=f'New message from {sender_name}',
+            message=f'{sender_name} sent you a message: "{message.subject}"',
+            link_type='message',
+            link_id=message.id
+        )
+        
+        return message
 
 
 class MessageListSerializer(serializers.ModelSerializer):

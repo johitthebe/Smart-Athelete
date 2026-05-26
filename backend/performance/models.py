@@ -223,12 +223,19 @@ class PerformanceLog(models.Model):
     date_logged = models.DateTimeField(default=timezone.now)
     created_at = models.DateTimeField(auto_now_add=True)
     
+    # Personal Best tracking
+    is_personal_best = models.BooleanField(
+        default=False,
+        help_text="True if this log represents a personal best for this goal/activity"
+    )
+    
     class Meta:
         ordering = ['-date', '-created_at']
         indexes = [
             models.Index(fields=['athlete', 'date']),
             models.Index(fields=['goal']),
             models.Index(fields=['activity_type']),
+            models.Index(fields=['is_personal_best']),
         ]
 
     def __str__(self):

@@ -227,53 +227,105 @@ class BenchmarkComparisonView(APIView):
         comparison_data = []
         
         for goal in active_goals:
-            # Get athlete's best performance for this goal
-            best_log = PerformanceLog.objects.filter(
-                athlete=athlete,
-                goal=goal
-            ).order_by('value').first() if goal.logs.exists() else None
+            # Get athlete's best performance for this goal based on target_metric
+            best_value = None
+            current_value = None
             
-            # Get current (latest) performance
-            current_log = goal.logs.order_by('-date').first() if goal.logs.exists() else None
+            if goal.logs.exists():
+                if goal.target_metric == 'distance':
+                    # For distance, higher is better
+                    best_log = goal.logs.filter(distance__isnull=False).order_by('-distance').first()
+                    current_log = goal.logs.filter(distance__isnull=False).order_by('-date').first()
+                    best_value = best_log.distance if best_log else None
+                    current_value = current_log.distance if current_log else None
+                elif goal.target_metric == 'duration':
+                    # For duration, higher is better (more time trained)
+                    best_log = goal.logs.filter(duration__isnull=False).order_by('-duration').first()
+                    current_log = goal.logs.filter(duration__isnull=False).order_by('-date').first()
+                    best_value = (best_log.duration / 60) if best_log else None  # Convert to minutes
+                    current_value = (current_log.duration / 60) if current_log else None
+                elif goal.target_metric == 'calories':
+                    # For calories, higher is better
+                    best_log = goal.logs.filter(calories__isnull=False).order_by('-calories').first()
+                    current_log = goal.logs.filter(calories__isnull=False).order_by('-date').first()
+                    best_value = best_log.calories if best_log else None
+                    current_value = current_log.calories if current_log else None
             
             # Calculate how many users this athlete has beaten
             users_beaten = 0
             total_competitors = 0
-            if best_log and best_log.value:
-                # Count unique athletes with worse performance in same event/activity
-                if goal.activity_type or goal.event:
-                    # Get all unique athletes who have logged this event/activity
-                    all_athlete_ids = PerformanceLog.objects.filter(
-                        Q(activity_type=goal.activity_type) | Q(event=goal.event)
-                    ).exclude(athlete=athlete).values_list('athlete_id', flat=True).distinct()
-                    
-                    total_competitors = len(set(all_athlete_ids))
-                    
-                    # Count how many athletes have worse best performance
-                    for athlete_id in all_athlete_ids:
-                        their_best = PerformanceLog.objects.filter(
-                            athlete_id=athlete_id
-                        ).filter(
-                            Q(activity_type=goal.activity_type) | Q(event=goal.event)
-                        ).order_by('value').first()
-                        
-                        if their_best and their_best.value > best_log.value:
-                            users_beaten += 1
             
-            # Get competing athletes (other athletes with same event/activity)
+            if best_value and (goal.activity_type or goal.event):
+                # Get all unique athletes who have logged this event/activity
+                all_athlete_ids = PerformanceLog.objects.filter(
+                    Q(activity_type=goal.activity_type) | Q(event=goal.event)
+                ).exclude(athlete=athlete).values_list('athlete_id', flat=True).distinct()
+                
+                total_competitors = len(set(all_athlete_ids))
+                
+                # Count how many athletes have worse best performance
+                for athlete_id in all_athlete_ids:
+                    their_logs = PerformanceLog.objects.filter(
+                        athlete_id=athlete_id
+                    ).filter(
+                        Q(activity_type=goal.activity_type) | Q(event=goal.event)
+                    )
+                    
+                    their_best_value = None
+                    if goal.target_metric == 'distance':
+                        their_best_log = their_logs.filter(distance__isnull=False).order_by('-distance').first()
+                        their_best_value = their_best_log.distance if their_best_log else None
+                    elif goal.target_metric == 'duration':
+                        their_best_log = their_logs.filter(duration__isnull=False).order_by('-duration').first()
+                        their_best_value = (their_best_log.duration / 60) if their_best_log else None
+                    elif goal.target_metric == 'calories':
+                        their_best_log = their_logs.filter(calories__isnull=False).order_by('-calories').first()
+                        their_best_value = their_best_log.calories if their_best_log else None
+                    
+                    # For these metrics, higher is better, so we beat them if our value is higher
+                    if their_best_value and best_value > their_best_value:
+                        users_beaten += 1
+            
+            # Get competing athletes (other athletes' best performances)
             competing_athletes = []
             if goal.activity_type or goal.event:
                 # Find other athletes' best performances
-                other_logs = PerformanceLog.objects.filter(
+                other_athlete_ids = PerformanceLog.objects.filter(
                     Q(activity_type=goal.activity_type) | Q(event=goal.event)
-                ).exclude(athlete=athlete).select_related('athlete').order_by('value')[:5]
+                ).exclude(athlete=athlete).values_list('athlete_id', flat=True).distinct()[:5]
                 
-                for log in other_logs:
-                    competing_athletes.append({
-                        'name': f"{log.athlete.first_name} {log.athlete.last_name}".strip() or log.athlete.username,
-                        'value': log.value,
-                        'unit': goal.target_unit,
-                    })
+                for other_athlete_id in other_athlete_ids:
+                    other_logs = PerformanceLog.objects.filter(
+                        athlete_id=other_athlete_id
+                    ).filter(
+                        Q(activity_type=goal.activity_type) | Q(event=goal.event)
+                    ).select_related('athlete')
+                    
+                    other_best_value = None
+                    other_athlete_name = None
+                    
+                    if goal.target_metric == 'distance':
+                        other_best_log = other_logs.filter(distance__isnull=False).order_by('-distance').first()
+                        if other_best_log:
+                            other_best_value = other_best_log.distance
+                            other_athlete_name = f"{other_best_log.athlete.first_name} {other_best_log.athlete.last_name}".strip() or other_best_log.athlete.username
+                    elif goal.target_metric == 'duration':
+                        other_best_log = other_logs.filter(duration__isnull=False).order_by('-duration').first()
+                        if other_best_log:
+                            other_best_value = other_best_log.duration / 60
+                            other_athlete_name = f"{other_best_log.athlete.first_name} {other_best_log.athlete.last_name}".strip() or other_best_log.athlete.username
+                    elif goal.target_metric == 'calories':
+                        other_best_log = other_logs.filter(calories__isnull=False).order_by('-calories').first()
+                        if other_best_log:
+                            other_best_value = other_best_log.calories
+                            other_athlete_name = f"{other_best_log.athlete.first_name} {other_best_log.athlete.last_name}".strip() or other_best_log.athlete.username
+                    
+                    if other_best_value and other_athlete_name:
+                        competing_athletes.append({
+                            'name': other_athlete_name,
+                            'value': other_best_value,
+                            'unit': goal.target_unit,
+                        })
             
             comparison_data.append({
                 'goal_id': goal.id,
@@ -281,8 +333,8 @@ class BenchmarkComparisonView(APIView):
                 'event': goal.event or (goal.activity_type.name if goal.activity_type else ''),
                 'activity_type': goal.activity_type.name if goal.activity_type else None,
                 'target_value': goal.target_value,
-                'current_value': current_log.value if current_log else None,
-                'best_value': best_log.value if best_log else None,
+                'current_value': current_value,
+                'best_value': best_value,
                 'progress_percentage': goal.progress_percentage(),
                 'unit': goal.target_unit,
                 'benchmark': {
@@ -430,9 +482,55 @@ class CoachFeedbackViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN
             )
         
+        # Get rating from request if provided
+        rating = request.data.get('rating')
+        if rating:
+            try:
+                rating = int(rating)
+                if 1 <= rating <= 5:
+                    feedback.rating = rating
+                else:
+                    return Response(
+                        {'error': 'Rating must be between 1 and 5'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            except (ValueError, TypeError):
+                return Response(
+                    {'error': 'Invalid rating value'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
         feedback.mark_as_acknowledged()
         serializer = self.get_serializer(feedback)
         return Response(serializer.data)
+    
+    @action(detail=False, methods=['post'])
+    def mark_all_read(self, request):
+        """Mark all feedback as read - only for athletes"""
+        if request.user.role != 'athlete':
+            return Response(
+                {'error': 'Only athletes can mark feedback as read'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Get all unread feedback for this athlete
+        unread_feedback = CoachFeedback.objects.filter(
+            athlete=request.user,
+            is_read=False
+        )
+        
+        count = unread_feedback.count()
+        
+        # Mark all as read
+        unread_feedback.update(
+            is_read=True,
+            read_at=timezone.now()
+        )
+        
+        return Response({
+            'message': f'{count} feedback items marked as read',
+            'count': count
+        })
     
     @action(detail=False, methods=['get'])
     def for_athlete(self, request):
