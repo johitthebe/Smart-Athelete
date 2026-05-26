@@ -1,0 +1,22 @@
+# Generated migration for adding is_personal_best field
+
+from django.db import migrations, models
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ('performance', '0011_coachfeedback_rating'),
+    ]
+
+    operations = [
+        migrations.AddField(
+            model_name='performancelog',
+            name='is_personal_best',
+            field=models.BooleanField(default=False, help_text='True if this log represents a personal best for this goal/activity'),
+        ),
+        migrations.AddIndex(
+            model_name='performancelog',
+            index=models.Index(fields=['is_personal_best'], name='performance_is_pers_idx'),
+        ),
+    ]

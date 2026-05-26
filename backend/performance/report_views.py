@@ -176,9 +176,11 @@ class PerformanceAnalyticsView(APIView):
         now = timezone.now().date()
         if range_param == 'week':
             start_date = now - timedelta(days=7)
+        elif range_param == '3months':
+            start_date = now - timedelta(days=90)
         elif range_param == 'year':
             start_date = now - timedelta(days=365)
-        else:
+        else:  # default to 'month'
             start_date = now - timedelta(days=30)
 
         logs = PerformanceLog.objects.filter(

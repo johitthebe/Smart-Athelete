@@ -14,11 +14,12 @@ class Migration(migrations.Migration):
             name='coachrequest',
             options={'ordering': ['-requested_at']},
         ),
-        migrations.RenameField(
-            model_name='coachrequest',
-            old_name='created_at',
-            new_name='requested_at',
-        ),
+        # RenameField removed - already done in migration 0008
+        # migrations.RenameField(
+        #     model_name='coachrequest',
+        #     old_name='created_at',
+        #     new_name='requested_at',
+        # ),
         migrations.RenameIndex(
             model_name='athleteprofile',
             new_name='accounts_at_user_id_e0114f_idx',
