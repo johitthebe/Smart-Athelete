@@ -19,7 +19,8 @@ class UserSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         password = validated_data.pop("password")
-        user = User.objects.create_user(password=password, **validated_data)
+        # Create user as inactive by default (requires email verification)
+        user = User.objects.create_user(password=password, is_active=False, **validated_data)
         return user
 
 from accounts.models import CoachCredential, CoachApproval

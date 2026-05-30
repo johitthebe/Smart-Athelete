@@ -2,6 +2,10 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import MinValueValidator, MaxValueValidator
 from .activity_models import UserActivity
+from django.utils import timezone
+from datetime import timedelta
+import random
+import string
 
 class User(AbstractUser):
 
@@ -292,3 +296,42 @@ class AthleteProfile(models.Model):
     
     def __str__(self):
         return f"Profile: {self.user.get_full_name()} - {self.fitness_level}"
+
+
+class EmailVerificationOTP(models.Model):
+    """Model to store email verification OTPs"""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='verification_otps')
+    otp_code = models.CharField(max_length=6)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    is_used = models.BooleanField(default=False)
+    
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', 'is_used']),
+            models.Index(fields=['otp_code', 'expires_at']),
+        ]
+    
+    def __str__(self):
+        return f"OTP for {self.user.email} - {self.otp_code}"
+    
+    def is_valid(self):
+        """Check if OTP is still valid"""
+        return not self.is_used and timezone.now() < self.expires_at
+    
+    @staticmethod
+    def generate_otp():
+        """Generate a 6-digit OTP"""
+        return ''.join(random.choices(string.digits, k=6))
+    
+    @classmethod
+    def create_otp(cls, user):
+        """Create a new OTP for user"""
+        otp_code = cls.generate_otp()
+        expires_at = timezone.now() + timedelta(minutes=10)  # OTP valid for 10 minutes
+        return cls.objects.create(
+            user=user,
+            otp_code=otp_code,
+            expires_at=expires_at
+        )

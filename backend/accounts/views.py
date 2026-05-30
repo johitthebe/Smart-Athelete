@@ -5,17 +5,37 @@ from rest_framework import status
 from django.contrib.auth import authenticate, update_session_auth_hash
 from .serializers import UserSerializer
 from .activity_utils import log_activity
+from .models import EmailVerificationOTP
+from .otp_views import send_otp_email
 
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def register_api(request):
     """
-    Register a new user.
+    Register a new user and send OTP verification email.
     """
     serializer = UserSerializer(data=request.data)
     if serializer.is_valid():
+        # Create user (serializer sets is_active=False by default)
         user = serializer.save()
+        
+        # Create OTP for email verification
+        otp = EmailVerificationOTP.create_otp(user)
+        
+        # Send OTP email
+        email_sent = send_otp_email(user, otp.otp_code)
+        
+        if not email_sent:
+            # If email fails, still return success but notify about email issue
+            return Response(
+                {
+                    "message": "Account created but verification email failed to send. Please use resend option.",
+                    "email": user.email,
+                    "requires_verification": True
+                },
+                status=status.HTTP_201_CREATED,
+            )
         
         # Log activity
         log_activity(
@@ -28,14 +48,9 @@ def register_api(request):
         
         return Response(
             {
-                "message": "Registered successfully",
-                "user": {
-                    "id": user.id,
-                    "username": user.username,
-                    "email": user.email,
-                    # if your custom User model has role field:
-                    "role": getattr(user, "role", None),
-                },
+                "message": "Registration successful. Please check your email for verification code.",
+                "email": user.email,
+                "requires_verification": True
             },
             status=status.HTTP_201_CREATED,
         )
@@ -150,6 +165,23 @@ def login_api(request):
     user = authenticate(request, username=username, password=password)
 
     if not user:
+        # Check if user exists but is inactive (unverified email)
+        try:
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            inactive_user = User.objects.get(username=username)
+            if not inactive_user.is_active:
+                return Response(
+                    {
+                        "error": "Email not verified. Please verify your email to login.",
+                        "email": inactive_user.email,
+                        "requires_verification": True
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+        except User.DoesNotExist:
+            pass
+        
         return Response(
             {"error": "Invalid credentials"},
             status=status.HTTP_401_UNAUTHORIZED,

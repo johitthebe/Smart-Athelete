@@ -14,6 +14,7 @@ from .views import (
     delete_profile_picture
 )
 from .password_reset_views import request_password_reset, reset_password
+from .otp_views import verify_email_otp, resend_otp, check_verification_status
 from .coach_request_views import (
     AvailableCoachesView,
     CoachRequestViewSet,
@@ -39,8 +40,16 @@ urlpatterns = [
     path("change-password/", change_password, name="change_password"),
     path("profile-picture/", upload_profile_picture, name="upload_profile_picture"),
     path("profile-picture/delete/", delete_profile_picture, name="delete_profile_picture"),
+    
+    # Email verification endpoints
+    path("verify-email/", verify_email_otp, name="verify_email_otp"),
+    path("resend-otp/", resend_otp, name="resend_otp"),
+    path("check-verification/", check_verification_status, name="check_verification_status"),
+    
+    # Password reset endpoints
     path("password-reset/request/", request_password_reset, name="password_reset_request"),
     path("password-reset/confirm/", reset_password, name="password_reset_confirm"),
+    
     path("coach/credentials/", CoachCredentialUploadView.as_view(), name="coach_credential_upload"),
     path("coach/credentials/list/", CoachCredentialListView.as_view(), name="coach_credential_list"),
     path("coach/credentials/<int:pk>/", CoachCredentialDeleteView.as_view(), name="coach_credential_delete"),
