@@ -24,33 +24,42 @@ def register_api(request):
         otp = EmailVerificationOTP.create_otp(user)
         
         # Send OTP email
-        email_sent = send_otp_email(user, otp.otp_code)
+        try:
+            email_sent = send_otp_email(user, otp.otp_code)
+        except Exception as e:
+            print(f"Error in send_otp_email: {e}")
+            email_sent = False
         
+        # Log activity
+        try:
+            log_activity(
+                user=user,
+                action_type='user_registered',
+                description=f"{user.username} registered as {user.role}",
+                metadata={'role': user.role, 'email': user.email},
+                request=request
+            )
+        except Exception as e:
+            print(f"Error logging activity: {e}")
+        
+        # Always return consistent response format
         if not email_sent:
-            # If email fails, still return success but notify about email issue
             return Response(
                 {
                     "message": "Account created but verification email failed to send. Please use resend option.",
                     "email": user.email,
-                    "requires_verification": True
+                    "requires_verification": True,
+                    "email_sent": False
                 },
                 status=status.HTTP_201_CREATED,
             )
-        
-        # Log activity
-        log_activity(
-            user=user,
-            action_type='user_registered',
-            description=f"{user.username} registered as {user.role}",
-            metadata={'role': user.role, 'email': user.email},
-            request=request
-        )
         
         return Response(
             {
                 "message": "Registration successful. Please check your email for verification code.",
                 "email": user.email,
-                "requires_verification": True
+                "requires_verification": True,
+                "email_sent": True
             },
             status=status.HTTP_201_CREATED,
         )

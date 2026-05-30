@@ -63,9 +63,14 @@ Smart Athlete Team
             html_message=html_message,
             fail_silently=False,
         )
+        print(f"✅ OTP email sent successfully to {user.email}")
         return True
     except Exception as e:
-        print(f"Error sending OTP email: {e}")
+        print(f"❌ Error sending OTP email to {user.email}: {e}")
+        print(f"Email settings - Backend: {settings.EMAIL_BACKEND}")
+        print(f"Email settings - Host: {settings.EMAIL_HOST}")
+        print(f"Email settings - Port: {settings.EMAIL_PORT}")
+        print(f"Email settings - From: {settings.DEFAULT_FROM_EMAIL}")
         return False
 
 
