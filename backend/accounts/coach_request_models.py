@@ -1,9 +1,7 @@
 from django.db import models
-from django.contrib.auth import get_user_model
+from django.conf import settings
 from django.utils import timezone
 from datetime import timedelta
-
-User = get_user_model()
 
 
 class CoachRequest(models.Model):
@@ -19,13 +17,13 @@ class CoachRequest(models.Model):
     )
     
     athlete = models.ForeignKey(
-        User,
+        settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name='coach_requests_sent',
         limit_choices_to={'role': 'athlete'}
     )
     coach = models.ForeignKey(
-        User,
+        settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name='coach_requests_received',
         limit_choices_to={'role': 'coach'}
@@ -95,7 +93,7 @@ class CoachCapacityLog(models.Model):
     )
     
     coach = models.ForeignKey(
-        User,
+        settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name='capacity_logs'
     )
