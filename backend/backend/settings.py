@@ -16,6 +16,8 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-change-this-key')
 DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '127.0.0.1,localhost').split(',')
+# Add Render and Vercel hosts for production
+ALLOWED_HOSTS.extend(['.onrender.com', '.vercel.app'])
 
 # Disable APPEND_SLASH to prevent issues with POST requests without trailing slashes
 # Next.js proxy handles URL rewriting, and we want to avoid redirect issues with POST data
@@ -129,16 +131,28 @@ TEMPLATES = [
 WSGI_APPLICATION = "backend.wsgi.application"
 
 # Database
-DATABASES = {
-    "default": {
-        "ENGINE": os.getenv('DB_ENGINE', 'django.db.backends.postgresql'),
-        "NAME": os.getenv('DB_NAME', 'smart_athlete'),
-        "USER": os.getenv('DB_USER', 'postgres'),
-        "PASSWORD": os.getenv('DB_PASSWORD', ''),
-        "HOST": os.getenv('DB_HOST', 'localhost'),
-        "PORT": os.getenv('DB_PORT', '5432'),
+import dj_database_url
+
+# Use DATABASE_URL if available (for production), otherwise use individual settings
+if os.getenv('DATABASE_URL'):
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=os.getenv('DATABASE_URL'),
+            conn_max_age=600,
+            conn_health_checks=True,
+        )
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": os.getenv('DB_ENGINE', 'django.db.backends.postgresql'),
+            "NAME": os.getenv('DB_NAME', 'smart_athlete'),
+            "USER": os.getenv('DB_USER', 'postgres'),
+            "PASSWORD": os.getenv('DB_PASSWORD', ''),
+            "HOST": os.getenv('DB_HOST', 'localhost'),
+            "PORT": os.getenv('DB_PORT', '5432'),
+        }
+    }
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
