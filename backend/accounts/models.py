@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import MinValueValidator, MaxValueValidator
 from .activity_models import UserActivity
+from .coach_request_models import CoachRequest, CoachCapacityLog
 from django.utils import timezone
 from datetime import timedelta
 import random
