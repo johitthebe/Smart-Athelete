@@ -135,7 +135,7 @@ class CoachAthleteAssignment(models.Model):
         limit_choices_to={'role': 'athlete'}
     )
     request = models.ForeignKey(
-        'CoachRequest',
+        'accounts.CoachRequest',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
