@@ -18,7 +18,7 @@ class SuggestedGoal(models.Model):
     unit = models.CharField(max_length=50)
     deadline_weeks = models.IntegerField()
     
-    # AI reasoning
+    # Reasoning and difficulty
     DIFFICULTY_CHOICES = [
         ('conservative', 'Conservative'),
         ('recommended', 'Recommended'),
@@ -131,7 +131,7 @@ class SuggestedWorkout(models.Model):
     intensity = models.CharField(max_length=20)
     estimated_duration = models.IntegerField(help_text="Duration in minutes")
     
-    # AI reasoning
+    # Reasoning and benefits
     reasoning = models.TextField()
     benefit = models.CharField(max_length=200)
     

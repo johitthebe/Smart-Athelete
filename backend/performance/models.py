@@ -181,7 +181,7 @@ class PerformanceLog(models.Model):
         help_text="1-10 scale"
     )
     
-    # AI-Enhanced Context Fields (No devices needed!)
+    # Enhanced Context Fields (No devices needed!)
     INTENSITY_CHOICES = [
         ('easy', 'Easy Recovery'),
         ('moderate', 'Steady'),
